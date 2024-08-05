@@ -42,24 +42,24 @@ UART_BAUD=${UART_BAUD}
 UDP_PORT=${UDP_PORT}
 EOF"
 
-# Step 3: Create the configuration template
-print_progress "Creating configuration template..."
+# Step 3: Create the configuration file directly
+print_progress "Creating configuration file..."
 sudo mkdir -p /etc/mavlink-router
-sudo bash -c "cat <<EOF > /etc/mavlink-router/main.conf.template
+sudo bash -c "cat <<EOF > /etc/mavlink-router/main.conf
 [General]
 TcpServerPort=5760
 ReportStats=false
 
 [UartEndpoint uart]
-Device=\${UART_DEVICE}
-Baud=\${UART_BAUD}
+Device=${UART_DEVICE}
+Baud=${UART_BAUD}
 
 [UdpEndpoint udp]
 Address=0.0.0.0
-Port=\${UDP_PORT}
+Port=${UDP_PORT}
 EOF"
 
-# Step 4: Create the interactive script
+# Step 4: Create the interactive script (for future updates if needed)
 print_progress "Creating interactive script..."
 sudo bash -c "cat <<EOF > /usr/bin/generate_mavlink_config.sh
 #!/bin/bash
@@ -91,7 +91,6 @@ After=network.target
 
 [Service]
 EnvironmentFile=/etc/default/mavlink-router
-ExecStartPre=/usr/bin/generate_mavlink_config.sh
 ExecStart=/usr/bin/mavlink-routerd -c /etc/mavlink-router/main.conf
 Restart=on-failure
 RestartSec=10
