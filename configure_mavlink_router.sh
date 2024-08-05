@@ -74,14 +74,8 @@ EOF"
 # Make the script executable
 sudo chmod +x /usr/bin/generate_mavlink_config.sh
 
-# Step 5: Verify the path of mavlink-routerd and update the service file accordingly
-MAVLINK_ROUTERD_PATH=$(which mavlink-routerd)
-if [[ -z "$MAVLINK_ROUTERD_PATH" ]]; then
-    echo "Error: mavlink-routerd not found in PATH. Ensure mavlink-router is installed correctly."
-    exit 1
-fi
-
-print_progress "Creating systemd service file with mavlink-routerd path: $MAVLINK_ROUTERD_PATH"
+# Step 5: Create the systemd service file
+print_progress "Creating systemd service file..."
 sudo bash -c "cat <<EOF > /etc/systemd/system/mavlink-router.service
 [Unit]
 Description=MAVLink Router Service
@@ -90,7 +84,7 @@ After=network.target
 [Service]
 EnvironmentFile=/etc/default/mavlink-router
 ExecStartPre=/usr/bin/generate_mavlink_config.sh
-ExecStart=${MAVLINK_ROUTERD_PATH} -c /etc/mavlink-router/main.conf
+ExecStart=/usr/bin/mavlink-routerd -c /etc/mavlink-router/main.conf
 Restart=on-failure
 RestartSec=10
 
