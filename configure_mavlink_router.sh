@@ -14,6 +14,15 @@ print_progress() {
     echo "================================================================="
 }
 
+# Remind user to enable UART and disable serial console
+print_progress "Ensure that UART is enabled and the serial console is disabled."
+echo "You can enable UART and disable the serial console using raspi-config."
+echo "1. Run: sudo raspi-config"
+echo "2. Navigate to: Interface Options -> Serial Port"
+echo "3. Disable the serial console and enable the serial port hardware"
+echo "4. Reboot the Raspberry Pi after making these changes."
+read -p "Press Enter to continue after making these changes..."
+
 # Step 1: Prompt for UART device, baud rate, and UDP port
 read -p "Enter UART device (default: /dev/serial0): " UART_DEVICE
 UART_DEVICE=${UART_DEVICE:-/dev/serial0}
@@ -65,8 +74,14 @@ EOF"
 # Make the script executable
 sudo chmod +x /usr/bin/generate_mavlink_config.sh
 
-# Step 5: Create the systemd service file
-print_progress "Creating systemd service file..."
+# Step 5: Verify the path of mavlink-routerd and update the service file accordingly
+MAVLINK_ROUTERD_PATH=$(which mavlink-routerd)
+if [[ -z "$MAVLINK_ROUTERD_PATH" ]]; then
+    echo "Error: mavlink-routerd not found in PATH. Ensure mavlink-router is installed correctly."
+    exit 1
+fi
+
+print_progress "Creating systemd service file with mavlink-routerd path: $MAVLINK_ROUTERD_PATH"
 sudo bash -c "cat <<EOF > /etc/systemd/system/mavlink-router.service
 [Unit]
 Description=MAVLink Router Service
@@ -75,7 +90,7 @@ After=network.target
 [Service]
 EnvironmentFile=/etc/default/mavlink-router
 ExecStartPre=/usr/bin/generate_mavlink_config.sh
-ExecStart=/usr/bin/mavlink-routerd -c /etc/mavlink-router/main.conf
+ExecStart=${MAVLINK_ROUTERD_PATH} -c /etc/mavlink-router/main.conf
 Restart=on-failure
 RestartSec=10
 
