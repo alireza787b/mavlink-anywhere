@@ -52,7 +52,7 @@ EOF"
 
 # Step 4: Create the interactive script
 print_progress "Creating interactive script..."
-sudo bash -c "cat <<EOF > /usr/local/bin/generate_mavlink_config.sh
+sudo bash -c "cat <<EOF > /usr/bin/generate_mavlink_config.sh
 #!/bin/bash
 
 # Load existing environment variables
@@ -63,7 +63,7 @@ envsubst < /etc/mavlink-router/main.conf.template > /etc/mavlink-router/main.con
 EOF"
 
 # Make the script executable
-sudo chmod +x /usr/local/bin/generate_mavlink_config.sh
+sudo chmod +x /usr/bin/generate_mavlink_config.sh
 
 # Step 5: Create the systemd service file
 print_progress "Creating systemd service file..."
@@ -74,8 +74,8 @@ After=network.target
 
 [Service]
 EnvironmentFile=/etc/default/mavlink-router
-ExecStartPre=/usr/local/bin/generate_mavlink_config.sh
-ExecStart=/usr/local/bin/mavlink-routerd -c /etc/mavlink-router/main.conf
+ExecStartPre=/usr/bin/generate_mavlink_config.sh
+ExecStart=/usr/bin/mavlink-routerd -c /etc/mavlink-router/main.conf
 Restart=on-failure
 RestartSec=10
 
