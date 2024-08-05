@@ -24,8 +24,8 @@ echo "4. Reboot the Raspberry Pi after making these changes."
 read -p "Press Enter to continue after making these changes..."
 
 # Step 1: Prompt for UART device, baud rate, and UDP port
-read -p "Enter UART device (default: /dev/serial0): " UART_DEVICE
-UART_DEVICE=${UART_DEVICE:-/dev/serial0}
+read -p "Enter UART device (default: /dev/ttyS0): " UART_DEVICE
+UART_DEVICE=${UART_DEVICE:-/dev/ttyS0}
 
 read -p "Enter UART baud rate (default: 57600): " UART_BAUD
 UART_BAUD=${UART_BAUD:-57600}
@@ -69,6 +69,14 @@ source /etc/default/mavlink-router
 
 # Generate configuration from template
 envsubst < /etc/mavlink-router/main.conf.template > /etc/mavlink-router/main.conf
+
+# Verify configuration file is correctly populated
+if ! grep -q '\\\$' /etc/mavlink-router/main.conf; then
+    echo "Configuration file generated successfully."
+else
+    echo "Error: Configuration file contains unresolved variables."
+    exit 1
+fi
 EOF"
 
 # Make the script executable
