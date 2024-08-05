@@ -83,7 +83,11 @@ EOF"
 # Make the script executable
 sudo chmod +x /usr/bin/generate_mavlink_config.sh
 
-# Step 5: Create the systemd service file
+# Step 5: Stop the service if it's already running
+print_progress "Stopping any existing mavlink-router service..."
+sudo systemctl stop mavlink-router
+
+# Step 6: Create the systemd service file
 print_progress "Creating systemd service file..."
 sudo bash -c "cat <<EOF > /etc/systemd/system/mavlink-router.service
 [Unit]
@@ -100,7 +104,7 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF"
 
-# Reload systemd, enable, and start the service
+# Step 7: Reload systemd, enable, and start the service
 print_progress "Reloading systemd, enabling, and starting mavlink-router service..."
 sudo systemctl daemon-reload
 sudo systemctl enable mavlink-router
@@ -110,3 +114,4 @@ sudo systemctl start mavlink-router
 print_progress "mavlink-router service installed and started successfully."
 echo "You can check the status with: sudo systemctl status mavlink-router"
 echo "Use QGroundControl to connect to the Raspberry Pi's IP address on port ${UDP_PORT}."
+echo "For more detailed logs, you can use: sudo journalctl -u mavlink-router -f"
