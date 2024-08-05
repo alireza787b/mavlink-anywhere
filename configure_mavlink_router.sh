@@ -15,13 +15,13 @@ print_progress() {
 }
 
 # Remind user to enable UART and disable serial console
-print_progress "Ensure that UART is enabled and the serial console is disabled."
+print_progress "If you are going to user the ttyS0, ensure that UART is enabled and the serial console is disabled."
 echo "You can enable UART and disable the serial console using raspi-config."
 echo "1. Run: sudo raspi-config"
 echo "2. Navigate to: Interface Options -> Serial Port"
 echo "3. Disable the serial console and enable the serial port hardware"
 echo "4. Reboot the Raspberry Pi after making these changes."
-read -p "Press Enter to continue after making these changes..."
+read -p "Press Enter if you are ready to continue..."
 
 # Check if an existing configuration file is available and read it
 CONFIG_FILE="/etc/mavlink-router/main.conf"
