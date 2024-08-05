@@ -55,6 +55,7 @@ Device=${UART_DEVICE}
 Baud=${UART_BAUD}
 
 [UdpEndpoint udp]
+Mode=server
 Address=0.0.0.0
 Port=${UDP_PORT}
 EOF"
