@@ -23,15 +23,29 @@ echo "3. Disable the serial console and enable the serial port hardware"
 echo "4. Reboot the Raspberry Pi after making these changes."
 read -p "Press Enter to continue after making these changes..."
 
-# Step 1: Prompt for UART device, baud rate, and UDP port
-read -p "Enter UART device (default: /dev/ttyS0): " UART_DEVICE
-UART_DEVICE=${UART_DEVICE:-/dev/ttyS0}
+# Check if an existing configuration file is available and read it
+CONFIG_FILE="/etc/mavlink-router/main.conf"
+if [ -f "$CONFIG_FILE" ]; then
+    print_progress "Existing configuration file found. Reading current settings..."
+    source /etc/default/mavlink-router
+    DEFAULT_UART_DEVICE=${UART_DEVICE}
+    DEFAULT_UART_BAUD=${UART_BAUD}
+    DEFAULT_UDP_ENDPOINTS=${UDP_ENDPOINTS}
+else
+    DEFAULT_UART_DEVICE="/dev/ttyS0"
+    DEFAULT_UART_BAUD="57600"
+    DEFAULT_UDP_ENDPOINTS="0.0.0.0:14550"
+fi
 
-read -p "Enter UART baud rate (default: 57600): " UART_BAUD
-UART_BAUD=${UART_BAUD:-57600}
+# Step 1: Prompt for UART device, baud rate, and UDP endpoints using existing settings as defaults
+read -p "Enter UART device (default: ${DEFAULT_UART_DEVICE}): " UART_DEVICE
+UART_DEVICE=${UART_DEVICE:-$DEFAULT_UART_DEVICE}
 
-read -p "Enter UDP port (default: 14550): " UDP_PORT
-UDP_PORT=${UDP_PORT:-14550}
+read -p "Enter UART baud rate (default: ${DEFAULT_UART_BAUD}): " UART_BAUD
+UART_BAUD=${UART_BAUD:-$DEFAULT_UART_BAUD}
+
+read -p "Enter UDP endpoints (default: ${DEFAULT_UDP_ENDPOINTS}). You can enter multiple endpoints separated by spaces: " UDP_ENDPOINTS
+UDP_ENDPOINTS=${UDP_ENDPOINTS:-$DEFAULT_UDP_ENDPOINTS}
 
 # Step 2: Create the environment file
 print_progress "Creating environment file with the provided values..."
@@ -39,7 +53,7 @@ sudo mkdir -p /etc/default
 sudo bash -c "cat <<EOF > /etc/default/mavlink-router
 UART_DEVICE=${UART_DEVICE}
 UART_BAUD=${UART_BAUD}
-UDP_PORT=${UDP_PORT}
+UDP_ENDPOINTS=${UDP_ENDPOINTS}
 EOF"
 
 # Step 3: Create the configuration file directly
@@ -54,11 +68,18 @@ ReportStats=false
 Device=${UART_DEVICE}
 Baud=${UART_BAUD}
 
+EOF"
+
+# Add UDP endpoints to the configuration file
+for ENDPOINT in ${UDP_ENDPOINTS}; do
+    sudo bash -c "cat <<EOF >> /etc/mavlink-router/main.conf
 [UdpEndpoint udp]
 Mode=server
-Address=0.0.0.0
-Port=${UDP_PORT}
+Address=$(echo ${ENDPOINT} | cut -d':' -f1)
+Port=$(echo ${ENDPOINT} | cut -d':' -f2)
+
 EOF"
+done
 
 # Step 4: Create the interactive script (for future updates if needed)
 print_progress "Creating interactive script..."
@@ -113,5 +134,5 @@ sudo systemctl start mavlink-router
 # Print success message
 print_progress "mavlink-router service installed and started successfully."
 echo "You can check the status with: sudo systemctl status mavlink-router"
-echo "Use QGroundControl to connect to the Raspberry Pi's IP address on port ${UDP_PORT}."
+echo "Use QGroundControl to connect to the Raspberry Pi's IP address on the configured UDP endpoints."
 echo "For more detailed logs, you can use: sudo journalctl -u mavlink-router -f"
