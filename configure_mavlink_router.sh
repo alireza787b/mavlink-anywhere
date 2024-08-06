@@ -53,7 +53,7 @@ sudo mkdir -p /etc/default
 sudo bash -c "cat <<EOF > /etc/default/mavlink-router
 UART_DEVICE=${UART_DEVICE}
 UART_BAUD=${UART_BAUD}
-UDP_ENDPOINTS=${UDP_ENDPOINTS}
+UDP_ENDPOINTS=\"${UDP_ENDPOINTS}\"
 EOF"
 
 # Step 3: Create the configuration file directly
@@ -70,7 +70,8 @@ Baud=${UART_BAUD}
 EOF"
 
 # Add UDP endpoints to the configuration file
-for ENDPOINT in ${UDP_ENDPOINTS}; do
+IFS=' ' read -r -a ENDPOINT_ARRAY <<< "${UDP_ENDPOINTS}"
+for ENDPOINT in "${ENDPOINT_ARRAY[@]}"; do
     sudo bash -c "cat <<EOF >> /etc/mavlink-router/main.conf
 [UdpEndpoint udp]
 Mode=normal
