@@ -15,7 +15,7 @@ print_progress() {
 }
 
 # Remind user to enable UART and disable serial console
-print_progress "If you are going to user the ttyS0, ensure that UART is enabled and the serial console is disabled."
+print_progress "If you are going to use ttyS0, ensure that UART is enabled and the serial console is disabled."
 echo "You can enable UART and disable the serial console using raspi-config."
 echo "1. Run: sudo raspi-config"
 echo "2. Navigate to: Interface Options -> Serial Port"
@@ -74,7 +74,7 @@ EOF"
 for ENDPOINT in ${UDP_ENDPOINTS}; do
     sudo bash -c "cat <<EOF >> /etc/mavlink-router/main.conf
 [UdpEndpoint udp]
-Mode=server
+Mode=normal
 Address=$(echo ${ENDPOINT} | cut -d':' -f1)
 Port=$(echo ${ENDPOINT} | cut -d':' -f2)
 
@@ -118,7 +118,7 @@ After=network.target
 [Service]
 EnvironmentFile=/etc/default/mavlink-router
 ExecStart=/usr/bin/mavlink-routerd -c /etc/mavlink-router/main.conf
-Restart=on-failure
+Restart=always
 RestartSec=10
 
 [Install]
@@ -136,3 +136,7 @@ print_progress "mavlink-router service installed and started successfully."
 echo "You can check the status with: sudo systemctl status mavlink-router"
 echo "Use QGroundControl to connect to the Raspberry Pi's IP address on the configured UDP endpoints."
 echo "For more detailed logs, you can use: sudo journalctl -u mavlink-router -f"
+echo "Configuration file is located at: /etc/mavlink-router/main.conf"
+echo "You can manually edit the configuration file if needed."
+echo "Final configuration file content:"
+cat /etc/mavlink-router/main.conf
