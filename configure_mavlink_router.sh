@@ -67,7 +67,6 @@ ReportStats=false
 [UartEndpoint uart]
 Device=${UART_DEVICE}
 Baud=${UART_BAUD}
-
 EOF"
 
 # Add UDP endpoints to the configuration file
@@ -77,7 +76,6 @@ for ENDPOINT in ${UDP_ENDPOINTS}; do
 Mode=normal
 Address=$(echo ${ENDPOINT} | cut -d':' -f1)
 Port=$(echo ${ENDPOINT} | cut -d':' -f2)
-
 EOF"
 done
 
