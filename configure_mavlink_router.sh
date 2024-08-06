@@ -71,13 +71,15 @@ EOF"
 
 # Add UDP endpoints to the configuration file
 IFS=' ' read -r -a ENDPOINT_ARRAY <<< "${UDP_ENDPOINTS}"
+INDEX=1
 for ENDPOINT in "${ENDPOINT_ARRAY[@]}"; do
     sudo bash -c "cat <<EOF >> /etc/mavlink-router/main.conf
-[UdpEndpoint udp]
+[UdpEndpoint udp${INDEX}]
 Mode=normal
 Address=$(echo ${ENDPOINT} | cut -d':' -f1)
 Port=$(echo ${ENDPOINT} | cut -d':' -f2)
 EOF"
+    INDEX=$((INDEX+1))
 done
 
 # Step 4: Create the interactive script (for future updates if needed)
