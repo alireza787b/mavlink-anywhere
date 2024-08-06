@@ -84,7 +84,7 @@ done
 
 # Step 4: Create the interactive script (for future updates if needed)
 print_progress "Creating interactive script..."
-sudo bash -c "cat <<EOF > /usr/bin/generate_mavlink_config.sh
+sudo bash -c "cat <<'EOF' > /usr/bin/generate_mavlink_config.sh
 #!/bin/bash
 
 # Load existing environment variables
