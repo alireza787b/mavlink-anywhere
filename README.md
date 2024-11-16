@@ -14,7 +14,7 @@ A detailed demonstration video covering these setup steps will be available soon
 ## Remote Connectivity
 
 ### Internet Connection Options
-- **4G/LTE**: Use USB 4G dongles for mobile connectivity
+- **5G/LTE**: Use USB 4G dongles for mobile connectivity
 - **Ethernet**: Direct connection to your network
 - **WiFi**: For WiFi connectivity, we recommend using our [Smart WiFi Manager](https://github.com/alireza787b/smart-wifi-manager) project to ensure robust and reliable connections to your predefined networks
 
