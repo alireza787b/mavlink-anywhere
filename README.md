@@ -2,6 +2,25 @@
 
 MAVLinkAnywhere is a general-purpose project that enables MAVLink data streaming to both local endpoints and remote locations over the internet. This project provides simplified scripts to install and configure `mavlink-router` on companion computers (Raspberry Pi, Jetson, etc.). `mavlink-router` is a powerful application that routes MAVLink packets between various endpoints, including UART, UDP, and TCP, making it ideal for MAVLink based UAV (PX4, Ardupilot, etc.) and drone communication systems.
 
+[![MAVLinkAnywhere Tutorial](https://img.youtube.com/vi/_QEWpoy6HSo/0.jpg)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
+
+## Video Tutorial and Setup Guide
+Watch our comprehensive setup guide that walks you through the entire process:
+- [Complete Guide to Stream Pixhawk/ArduPilot/PX4 Telemetry Data Anywhere (2024)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
+
+### Video Contents
+- 00:00 - Introduction
+- 02:15 - Setting up the Raspberry Pi
+- 04:30 - Local MAVLINK Streaming
+- 08:30 - Smart WiFi manager setup
+- 11:40 - Internet-based MAVLink Streaming
+- 15:00 - Outro
+
+### Required Hardware
+- Raspberry Pi (any model)
+- Pixhawk/ArduPilot/PX4 flight controller
+- Basic UART connection cables
+
 ## Prerequisites
 
 Before starting with MAVLinkAnywhere, ensure that:
@@ -9,21 +28,21 @@ Before starting with MAVLinkAnywhere, ensure that:
 - You have properly wired your Pixhawk's TELEM ports to the companion computer's UART TTL pins
 - MAVLink streaming is enabled on the TELEM port of your flight controller
 
-A detailed demonstration video covering these setup steps will be available soon.
-
 ## Remote Connectivity
 
 ### Internet Connection Options
 - **5G/4G/LTE**: Use USB Cellular dongles for mobile connectivity
 - **Ethernet**: Direct connection to your network interface
 - **WiFi**: For WiFi connectivity, we recommend using our [Smart WiFi Manager](https://github.com/alireza787b/smart-wifi-manager) project to ensure robust and reliable connections to your predefined networks
+- **Satellite Internet**: Compatible with various satellite internet solutions
 
 ### VPN Solutions
 For internet-based telemetry, you have several VPN options:
-1. [NetBird](https://netbird.io/) (Recommended, demo video coming soon)
+1. [NetBird](https://netbird.io/) (Recommended, demonstrated in video tutorial)
 2. [WireGuard](https://www.wireguard.com/)
 3. [Tailscale](https://tailscale.com/)
-4. [ZeroTier](https://www.zerotier.com/) ([Legacy Setup Video from 2020](https://www.youtube.com/watch?v=WoRce4Re3Wg&t=2242s) - Note: Our 2024 method is much simpler)
+4. [ZeroTier](https://www.zerotier.com/)
+   - [Legacy Setup Video from 2020](https://www.youtube.com/watch?v=WoRce4Re3Wg) (Note: Our 2024 method shown above is much simpler)
 
 Alternatively, you can configure port forwarding on your router.
 
@@ -94,6 +113,17 @@ Use QGroundControl to connect to your companion computer's IP address on the con
 
 ## Contact
 For more information, visit the [GitHub Repo](https://github.com/alireza787b/mavlink-anywhere).
+
+## Related Resources
+- [Smart WiFi Manager Project](https://github.com/alireza787b/smart-wifi-manager)
+- [NetBird VPN](https://netbird.io/)
+- [Original 2020 Tutorial (Legacy Method)](https://www.youtube.com/watch?v=WoRce4Re3Wg)
+
+## Support
+If you encounter any issues, please:
+1. Check the video tutorial timestamps for specific setup steps
+2. Review the relevant sections in this documentation
+3. Open an issue on GitHub with detailed information about your setup
 
 ## Keywords
 - MAVLink
