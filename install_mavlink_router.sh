@@ -132,9 +132,35 @@ source ~/mavlink-router-venv/bin/activate
 print_progress "Installing Meson in the virtual environment..."
 pip install meson || { echo "Meson installation failed"; cleanup_swap; deactivate; exit 1; }
 
+# Detect systemd directory for meson build
+detect_systemd_dir() {
+    # Try common systemd unit directory locations
+    if [ -d "/lib/systemd/system" ]; then
+        echo "/lib/systemd/system"
+    elif [ -d "/usr/lib/systemd/system" ]; then
+        echo "/usr/lib/systemd/system"
+    else
+        # Fallback to /lib/systemd/system (will be created during install)
+        echo "/lib/systemd/system"
+    fi
+}
+
+SYSTEMD_DIR=$(detect_systemd_dir)
+echo "Detected systemd directory: $SYSTEMD_DIR"
+
+# Check if pkg-config can find systemd (diagnostic)
+if pkg-config --exists systemd 2>/dev/null; then
+    echo "pkg-config: systemd found"
+    SYSTEMD_UNIT_DIR=$(pkg-config --variable=systemdsystemunitdir systemd 2>/dev/null || echo "$SYSTEMD_DIR")
+else
+    echo "pkg-config: systemd NOT found (using explicit path workaround)"
+    SYSTEMD_UNIT_DIR="$SYSTEMD_DIR"
+fi
+
 # Build with Meson and Ninja
 print_progress "Setting up the build with Meson..."
-meson setup build . || { echo "Meson setup failed"; cleanup_swap; deactivate; exit 1; }
+echo "Using systemd unit directory: $SYSTEMD_UNIT_DIR"
+meson setup build . -Dsystemdsystemunitdir="$SYSTEMD_UNIT_DIR" || { echo "Meson setup failed"; cleanup_swap; deactivate; exit 1; }
 print_progress "Building with Ninja..."
 ninja -C build || { echo "Ninja build failed"; cleanup_swap; deactivate; exit 1; }
 

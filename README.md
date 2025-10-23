@@ -72,7 +72,20 @@ Our installation script seamlessly installs `mavlink-router` on your companion c
 - Builds and installs `mavlink-router` using Meson and Ninja
 - Resets the swap space to its original size after installation
 
-**Note:** The installation script is compatible with all Debian/Raspbian versions, including the latest Bookworm release (2024+). It automatically detects your system's swap management method and adjusts accordingly.
+**Note:** The installation script is compatible with all Debian/Raspbian versions, including the latest Bookworm and Trixie releases (2024+). It automatically:
+- Detects your system's swap management method (dphys-swapfile or standard)
+- Bypasses pkg-config issues by explicitly setting the systemd directory
+- Works on Raspberry Pi 5 and all other Raspberry Pi models
+
+### Troubleshooting
+
+If you encounter build issues:
+
+1. **"Dependency systemd not found"** - The script automatically handles this by explicitly setting the systemd directory path, bypassing pkg-config lookup issues common on some Debian Trixie systems.
+
+2. **"dphys-swapfile: command not found"** - This is normal on newer systems. The script automatically falls back to standard Linux swap management.
+
+3. **Build failures due to low memory** - The script automatically increases swap space to 2GB during compilation and restores it afterward.
 
 ## Configuration Script
 The configuration script generates and updates the `mavlink-router` configuration, sets up a systemd service, and enables routing with flexible endpoint settings.
