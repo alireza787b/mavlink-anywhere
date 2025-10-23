@@ -64,13 +64,15 @@ Our installation script seamlessly installs `mavlink-router` on your companion c
 ### What the Installation Script Does:
 - Checks if `mavlink-router` is already installed
 - Removes any existing `mavlink-router` directory
-- Updates the system and installs required packages (`git`, `meson`, `ninja-build`, `pkg-config`, `gcc`, `g++`, `systemd`, `python3-venv`)
-- Increases the swap space to ensure successful compilation on low-memory systems
+- Updates the system and installs required packages (`git`, `meson`, `ninja-build`, `pkg-config`, `gcc`, `g++`, `systemd`, `libsystemd-dev`, `python3-venv`)
+- Intelligently manages swap space during compilation (supports both legacy `dphys-swapfile` and modern swap methods)
 - Clones the `mavlink-router` repository and initializes its submodules
 - Creates and activates a Python virtual environment
 - Installs the Meson build system in the virtual environment
 - Builds and installs `mavlink-router` using Meson and Ninja
 - Resets the swap space to its original size after installation
+
+**Note:** The installation script is compatible with all Debian/Raspbian versions, including the latest Bookworm release (2024+). It automatically detects your system's swap management method and adjusts accordingly.
 
 ## Configuration Script
 The configuration script generates and updates the `mavlink-router` configuration, sets up a systemd service, and enables routing with flexible endpoint settings.

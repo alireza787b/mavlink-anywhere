@@ -14,12 +14,78 @@ print_progress() {
     echo "================================================================="
 }
 
+# Detect swap management method
+SWAP_METHOD="none"
+ORIGINAL_SWAP_SIZE=100
+if command -v dphys-swapfile &> /dev/null && [ -f /etc/dphys-swapfile ]; then
+    SWAP_METHOD="dphys"
+    # Try to detect original swap size
+    if grep -q "CONF_SWAPSIZE=" /etc/dphys-swapfile; then
+        ORIGINAL_SWAP_SIZE=$(grep "CONF_SWAPSIZE=" /etc/dphys-swapfile | head -n1 | cut -d'=' -f2)
+    fi
+elif [ -f /swapfile ] || swapon --show | grep -q "/swapfile"; then
+    SWAP_METHOD="standard"
+else
+    SWAP_METHOD="none"
+fi
+
+# Function to increase swap space
+increase_swap() {
+    print_progress "Increasing swap space..."
+
+    if [ "$SWAP_METHOD" = "dphys" ]; then
+        # Using dphys-swapfile (traditional Raspberry Pi method)
+        sudo dphys-swapfile swapoff
+        sudo sed -i 's/CONF_SWAPSIZE=[0-9]*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
+        sudo dphys-swapfile setup
+        sudo dphys-swapfile swapon
+        echo "Swap increased to 2048MB using dphys-swapfile"
+    elif [ "$SWAP_METHOD" = "standard" ]; then
+        # Using standard Linux swap file
+        sudo swapoff /swapfile 2>/dev/null || true
+        sudo rm -f /swapfile
+        sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        echo "Swap increased to 2048MB using standard method"
+    else
+        # No existing swap, create new one
+        echo "No existing swap detected, creating new swap file..."
+        sudo fallocate -l 2G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        SWAP_METHOD="standard"
+        echo "Created 2048MB swap file"
+    fi
+}
+
 # Function to clean up swap space
 cleanup_swap() {
-    sudo dphys-swapfile swapoff
-    sudo sed -i 's/CONF_SWAPSIZE=2048/CONF_SWAPSIZE=100/' /etc/dphys-swapfile  # Assuming original size is 100
-    sudo dphys-swapfile setup
-    sudo dphys-swapfile swapon
+    print_progress "Resetting swap space to original size..."
+
+    if [ "$SWAP_METHOD" = "dphys" ]; then
+        # Restore dphys-swapfile to original size
+        sudo dphys-swapfile swapoff
+        sudo sed -i "s/CONF_SWAPSIZE=[0-9]*/CONF_SWAPSIZE=$ORIGINAL_SWAP_SIZE/" /etc/dphys-swapfile
+        sudo dphys-swapfile setup
+        sudo dphys-swapfile swapon
+        echo "Swap restored to ${ORIGINAL_SWAP_SIZE}MB using dphys-swapfile"
+    elif [ "$SWAP_METHOD" = "standard" ]; then
+        # Restore standard swap to original size (typically 100MB or 200MB)
+        sudo swapoff /swapfile
+        sudo rm -f /swapfile
+        # Use 200MB as default for modern systems
+        local restore_size=${ORIGINAL_SWAP_SIZE:-200}
+        sudo fallocate -l ${restore_size}M /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=$restore_size
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        echo "Swap restored to ${restore_size}MB using standard method"
+    else
+        echo "No swap management needed"
+    fi
 }
 
 # Stop any existing mavlink-router service
@@ -43,14 +109,10 @@ fi
 
 # Update and install packages
 print_progress "Updating and installing necessary packages..."
-sudo apt update && sudo apt install -y git meson ninja-build pkg-config gcc g++ systemd python3-venv || { echo "Installation of packages failed"; cleanup_swap; exit 1; }
+sudo apt update && sudo apt install -y git meson ninja-build pkg-config gcc g++ systemd libsystemd-dev python3-venv || { echo "Installation of packages failed"; cleanup_swap; exit 1; }
 
 # Increase swap space for low-memory systems
-print_progress "Increasing swap space..."
-sudo dphys-swapfile swapoff
-sudo sed -i 's/CONF_SWAPSIZE=[0-9]*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
-sudo dphys-swapfile setup
-sudo dphys-swapfile swapon
+increase_swap
 
 # Clone and navigate into the repository
 print_progress "Cloning mavlink-router repository..."
@@ -88,7 +150,6 @@ cd ~
 print_progress "mavlink-router installed successfully."
 
 # Reset swap space to original size
-print_progress "Resetting swap space to original size..."
 cleanup_swap
 
 print_progress "Installation script completed."
