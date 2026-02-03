@@ -1,0 +1,70 @@
+# =============================================================================
+# MAVLink Router Configuration Template
+# =============================================================================
+# This template is used by mavlink-anywhere for configuration generation.
+# Variables are substituted during configuration.
+#
+# For manual editing, modify /etc/mavlink-router/main.conf directly.
+# =============================================================================
+
+[General]
+# TCP server port for QGroundControl and other TCP clients
+TcpServerPort=5760
+
+# Disable statistics reporting
+ReportStats=false
+
+# =============================================================================
+# INPUT CONFIGURATION
+# =============================================================================
+# Uncomment ONE of the following input sections based on your setup:
+
+# --- UART Input (for serial connection to flight controller) ---
+[UartEndpoint uart]
+Device=${UART_DEVICE}
+Baud=${UART_BAUD}
+
+# --- UDP Input (for SITL or network-bridged setups) ---
+# [UdpEndpoint input]
+# Mode=server
+# Address=${INPUT_ADDRESS}
+# Port=${INPUT_PORT}
+
+# =============================================================================
+# OUTPUT ENDPOINTS
+# =============================================================================
+# Add UDP endpoints for each application that needs MAVLink data
+
+# MAVSDK - for drone control applications
+[UdpEndpoint mavsdk]
+Mode=normal
+Address=127.0.0.1
+Port=14540
+
+# mavlink2rest - for web-based telemetry
+[UdpEndpoint mavlink2rest]
+Mode=normal
+Address=127.0.0.1
+Port=14569
+
+# Local telemetry - for local monitoring
+[UdpEndpoint local_mavlink]
+Mode=normal
+Address=127.0.0.1
+Port=12550
+
+# GCS over VPN - for remote ground station
+# [UdpEndpoint gcs_vpn]
+# Mode=normal
+# Address=${GCS_IP}
+# Port=24550
+
+# =============================================================================
+# ADDITIONAL ENDPOINTS
+# =============================================================================
+# Add custom endpoints below as needed:
+#
+# [UdpEndpoint custom_name]
+# Mode=normal
+# Address=<IP_ADDRESS>
+# Port=<PORT>
