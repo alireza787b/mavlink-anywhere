@@ -729,31 +729,31 @@ else
     if [[ -f "$CONFIG_FILE" ]]; then
         echo "Existing configuration found. Reading current settings..."
         source /etc/default/mavlink-router 2>/dev/null || true
-        DEFAULT_UART_DEVICE=${UART_DEVICE:-/dev/ttyS0}
-        DEFAULT_UART_BAUD=${UART_BAUD:-57600}
-        DEFAULT_UDP_ENDPOINTS=${UDP_ENDPOINTS:-0.0.0.0:14550}
+        CFG_UART_DEVICE=${UART_DEVICE:-/dev/ttyS0}
+        CFG_UART_BAUD=${UART_BAUD:-57600}
+        CFG_UDP_ENDPOINTS=${UDP_ENDPOINTS:-0.0.0.0:14550}
     else
         # Use detected device as default
-        DEFAULT_UART_DEVICE=$(detect_uart_device)
-        DEFAULT_UART_BAUD="57600"
-        DEFAULT_UDP_ENDPOINTS="0.0.0.0:14550"
+        CFG_UART_DEVICE=$(detect_uart_device)
+        CFG_UART_BAUD="57600"
+        CFG_UDP_ENDPOINTS="0.0.0.0:14550"
     fi
 
     # Override with CLI-specified device if provided
-    [[ -n "$UART_DEVICE" ]] && DEFAULT_UART_DEVICE="$UART_DEVICE"
+    [[ -n "$UART_DEVICE" ]] && CFG_UART_DEVICE="$UART_DEVICE"
 
     echo ""
     echo "Enter configuration (press Enter to use defaults):"
     echo ""
 
-    read -p "UART device [${DEFAULT_UART_DEVICE}]: " UART_DEVICE
-    UART_DEVICE=${UART_DEVICE:-$DEFAULT_UART_DEVICE}
+    read -p "UART device [${CFG_UART_DEVICE}]: " UART_DEVICE
+    UART_DEVICE=${UART_DEVICE:-$CFG_UART_DEVICE}
 
-    read -p "Baud rate [${DEFAULT_UART_BAUD}]: " UART_BAUD
-    UART_BAUD=${UART_BAUD:-$DEFAULT_UART_BAUD}
+    read -p "Baud rate [${CFG_UART_BAUD}]: " UART_BAUD
+    UART_BAUD=${UART_BAUD:-$CFG_UART_BAUD}
 
-    read -p "UDP endpoints (space-separated) [${DEFAULT_UDP_ENDPOINTS}]: " UDP_ENDPOINTS
-    UDP_ENDPOINTS=${UDP_ENDPOINTS:-$DEFAULT_UDP_ENDPOINTS}
+    read -p "UDP endpoints (space-separated) [${CFG_UDP_ENDPOINTS}]: " UDP_ENDPOINTS
+    UDP_ENDPOINTS=${UDP_ENDPOINTS:-$CFG_UDP_ENDPOINTS}
 
     echo ""
     print_progress "Creating configuration..."
