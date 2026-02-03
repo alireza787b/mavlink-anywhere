@@ -355,17 +355,17 @@ check_serial_status() {
         dialout_ok="no"
     fi
 
-    # Output status
+    # Output status (values must be quoted for eval)
     cat <<EOF
-board_type=$board_type
-board_description=$board_desc
-rpi_model=$rpi_model
-architecture=$arch
-uart_enabled=$uart_enabled
-serial_console=$serial_console
-uart_device=$uart_device
-uart_valid=$uart_valid
-dialout_group=$dialout_ok
+board_type="$board_type"
+board_description="$board_desc"
+rpi_model="$rpi_model"
+architecture="$arch"
+uart_enabled="$uart_enabled"
+serial_console="$serial_console"
+uart_device="$uart_device"
+uart_valid="$uart_valid"
+dialout_group="$dialout_ok"
 EOF
 }
 
