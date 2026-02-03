@@ -2,13 +2,13 @@
 
 **Stream MAVLink telemetry from your drone to anywhere in the world.**
 
-Route MAVLink data from your flight controller (Pixhawk/ArduPilot/PX4) through a companion computer (Raspberry Pi, Jetson, etc.) to ground stations, SDKs, and remote locations over the internet.
+Route MAVLink data from your flight controller (Pixhawk/ArduPilot/PX4) through a companion computer to ground stations, SDKs, and remote locations.
 
 ---
 
 ## 📺 Video Tutorial
 
-**First time here? Watch the video - it covers everything!**
+**First time here? Watch the video!**
 
 [![MAVLink Anywhere Tutorial](https://img.youtube.com/vi/_QEWpoy6HSo/0.jpg)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
 
@@ -18,72 +18,41 @@ Route MAVLink data from your flight controller (Pixhawk/ArduPilot/PX4) through a
 
 ## 🚀 Quick Start
 
-Follow these steps on your Raspberry Pi (or companion computer):
-
-### Step 1: Clone the Repository
+### Step 1: Clone & Install
 
 ```bash
 git clone https://github.com/alireza787b/mavlink-anywhere.git
 cd mavlink-anywhere
-```
-
-### Step 2: Install mavlink-router
-
-```bash
 sudo ./install_mavlink_router.sh
 ```
 
-This builds and installs the mavlink-router binary. Takes 5-10 minutes on Raspberry Pi.
-
-### Step 3: Configure Serial Port (Raspberry Pi)
-
-Before configuring mavlink-router, ensure your serial port is ready:
+### Step 2: Configure
 
 ```bash
-sudo raspi-config
-```
-
-Navigate to:
-- **Interface Options** → **Serial Port**
-- "Login shell accessible over serial?" → **No**
-- "Serial port hardware enabled?" → **Yes**
-
-Then **reboot**:
-```bash
-sudo reboot
-```
-
-> 📖 **Need help?** See [UART Setup Guide](docs/UART-SETUP.md) for detailed instructions and wiring diagrams.
-
-### Step 4: Configure mavlink-router
-
-After reboot, run the configuration script:
-
-```bash
-cd mavlink-anywhere
 sudo ./configure_mavlink_router.sh
 ```
 
-The interactive prompts will guide you through:
-1. Selecting your UART device (e.g., `/dev/ttyS0`)
-2. Setting baud rate (typically `57600`)
-3. Adding UDP endpoints for your ground station
+The script will:
+- **Detect your platform** (Raspberry Pi, Jetson, generic Linux)
+- **Check serial port** configuration
+- **Guide you** through any needed setup (with auto-fix option on Raspberry Pi)
+- **Configure** mavlink-router with your settings
 
-### Step 5: Verify It's Working
+> **Note:** On Raspberry Pi, if serial port needs configuration, the script will offer to fix it automatically. This requires a **reboot**, after which you run the configure script again.
+
+### Step 3: Verify
 
 ```bash
 sudo systemctl status mavlink-router
 ```
 
-You should see `active (running)`. Connect QGroundControl to your Pi's IP address on port `14550`.
+You should see `active (running)`. Connect your ground station to the configured UDP ports.
 
 ---
 
 ## ✅ That's It!
 
-Your MAVLink data is now being routed. Connect your ground station software to the configured UDP endpoints.
-
-**Need remote/internet access?** See the [video tutorial](https://www.youtube.com/watch?v=_QEWpoy6HSo) for VPN setup with [NetBird](https://netbird.io/).
+The configure script handles everything - platform detection, serial setup, and configuration.
 
 ---
 
@@ -91,25 +60,21 @@ Your MAVLink data is now being routed. Connect your ground station software to t
 
 | Guide | Description |
 |-------|-------------|
-| [UART Setup Guide](docs/UART-SETUP.md) | Serial port configuration, wiring, Raspberry Pi setup |
-| [CLI Reference](docs/CLI-REFERENCE.md) | Advanced command-line options and automation |
+| [UART Setup Guide](docs/UART-SETUP.md) | Detailed serial port configuration and wiring |
+| [CLI Reference](docs/CLI-REFERENCE.md) | All command-line options |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |
 
 ---
 
 ## 🔧 Advanced Usage
 
-### Auto Mode (Skip Prompts)
-
-For quick setup with automatic UART detection:
+### Auto Mode (Minimal Prompts)
 
 ```bash
-sudo ./configure_mavlink_router.sh --auto --gcs-ip YOUR_GCS_IP
+sudo ./configure_mavlink_router.sh --auto --gcs-ip 192.168.1.100
 ```
 
-### Headless Mode (Scripted Automation)
-
-For automated deployments with no prompts:
+### Headless Mode (No Prompts)
 
 ```bash
 sudo ./configure_mavlink_router.sh --headless \
@@ -118,9 +83,13 @@ sudo ./configure_mavlink_router.sh --headless \
     --endpoints "127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550"
 ```
 
-### UDP Input (For Simulation/SITL)
+### USB Serial (No Boot Config Needed)
 
-Use UDP input instead of serial:
+```bash
+sudo ./configure_mavlink_router.sh --auto --uart /dev/ttyUSB0
+```
+
+### UDP Input (For Simulation)
 
 ```bash
 sudo ./configure_mavlink_router.sh --headless \
@@ -132,44 +101,41 @@ sudo ./configure_mavlink_router.sh --headless \
 ### CLI Commands
 
 ```bash
-./mavlink-anywhere status    # Show current status
+./mavlink-anywhere status    # Show status
 ./mavlink-anywhere test      # Test serial connection
-./mavlink-anywhere logs      # View service logs
-./mavlink-anywhere help      # See all commands
+./mavlink-anywhere logs      # View logs
+./mavlink-anywhere help      # All commands
 ```
 
-> 📖 See [CLI Reference](docs/CLI-REFERENCE.md) for complete documentation.
+---
+
+## 🔌 Supported Platforms
+
+| Platform | Serial Config | Notes |
+|----------|--------------|-------|
+| **Raspberry Pi** | Auto-detected | Script offers auto-fix for serial setup |
+| **NVIDIA Jetson** | Manual | Ensure UART is enabled |
+| **Generic Linux** | Manual | Ensure UART device exists |
+| **USB Serial** | None needed | Just plug in adapter |
+| **UDP Input** | None needed | For SITL/simulation |
 
 ---
 
-## 🔌 Hardware Requirements
+## 🌐 Remote Connectivity
 
-- **Companion Computer**: Raspberry Pi (any model), Jetson, or similar
-- **Flight Controller**: Pixhawk, ArduPilot, PX4, or MAVLink-compatible
-- **Connection**: UART cable from flight controller TELEM port to companion computer
+For internet streaming, you need:
 
----
-
-## 🌐 Remote Connectivity Options
-
-To stream telemetry over the internet, you need:
-
-1. **Internet connection** on your companion computer:
-   - WiFi (use [Smart WiFi Manager](https://github.com/alireza787b/smart-wifi-manager) for reliability)
-   - 4G/LTE USB dongle
-   - Ethernet
-
-2. **VPN** for secure remote access (recommended):
-   - [NetBird](https://netbird.io/) - Easiest, shown in video tutorial
+1. **Internet** on companion computer (WiFi, 4G, Ethernet)
+2. **VPN** for secure access:
+   - [NetBird](https://netbird.io/) - Recommended (shown in video)
    - [Tailscale](https://tailscale.com/)
    - [WireGuard](https://www.wireguard.com/)
-   - [ZeroTier](https://www.zerotier.com/)
 
 ---
 
-## 🤝 Integration with MDS
+## 🤝 MDS Integration
 
-mavlink-anywhere integrates with [MAVSDK Drone Show (MDS)](https://github.com/alireza787b/mavsdk_drone_show) for automated fleet setup:
+Integrates with [MAVSDK Drone Show](https://github.com/alireza787b/mavsdk_drone_show):
 
 ```bash
 sudo ./tools/mds_init.sh -d 1 -y --mavlink-auto --gcs-ip 100.96.32.75
@@ -179,9 +145,9 @@ sudo ./tools/mds_init.sh -d 1 -y --mavlink-auto --gcs-ip 100.96.32.75
 
 ## ❓ Need Help?
 
-1. **Watch the [video tutorial](https://www.youtube.com/watch?v=_QEWpoy6HSo)** - covers most setup scenarios
-2. **Check [Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - common issues and solutions
-3. **Open a [GitHub Issue](https://github.com/alireza787b/mavlink-anywhere/issues)** - for bugs or questions
+1. **[Video Tutorial](https://www.youtube.com/watch?v=_QEWpoy6HSo)** - Most common scenarios
+2. **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues
+3. **[GitHub Issues](https://github.com/alireza787b/mavlink-anywhere/issues)** - Bug reports
 
 ---
 
