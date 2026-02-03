@@ -98,13 +98,55 @@ sudo ./configure_mavlink_router.sh --headless \
     --endpoints "127.0.0.1:14540,127.0.0.1:14569"
 ```
 
-### CLI Commands
+---
+
+## 🛠️ Common Commands
+
+### Service Management
 
 ```bash
-./mavlink-anywhere status    # Show status
-./mavlink-anywhere test      # Test serial connection
-./mavlink-anywhere logs      # View logs
-./mavlink-anywhere help      # All commands
+# Check status
+sudo systemctl status mavlink-router
+
+# View live logs
+sudo journalctl -u mavlink-router -f
+
+# Restart service
+sudo systemctl restart mavlink-router
+
+# Stop/Start
+sudo systemctl stop mavlink-router
+sudo systemctl start mavlink-router
+```
+
+### Change Endpoints
+
+```bash
+# Re-run interactive config
+sudo ./configure_mavlink_router.sh
+
+# Or headless with new endpoints
+sudo ./configure_mavlink_router.sh --headless \
+    --endpoints "127.0.0.1:14550,192.168.1.100:14550"
+```
+
+### Edit Config Directly
+
+```bash
+# Edit configuration
+sudo nano /etc/mavlink-router/main.conf
+
+# Apply changes
+sudo systemctl restart mavlink-router
+```
+
+### CLI Helper (Optional)
+
+```bash
+./mavlink-router-cli.sh status      # Show status & config
+./mavlink-router-cli.sh logs        # View live logs
+./mavlink-router-cli.sh endpoints   # Quick endpoint edit
+./mavlink-router-cli.sh help        # All commands
 ```
 
 ---
