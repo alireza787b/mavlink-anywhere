@@ -16,7 +16,7 @@ _MAVLINK_COMMON_LOADED=1
 # CONSTANTS
 # =============================================================================
 
-readonly MAVLINK_ANYWHERE_VERSION="2.0.3"
+readonly MAVLINK_ANYWHERE_VERSION="2.0.4"
 readonly MAVLINK_ROUTER_CONFIG_DIR="/etc/mavlink-router"
 readonly MAVLINK_ROUTER_CONFIG_FILE="${MAVLINK_ROUTER_CONFIG_DIR}/main.conf"
 readonly MAVLINK_ROUTER_ENV_FILE="/etc/default/mavlink-router"

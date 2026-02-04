@@ -115,7 +115,7 @@ SKIP_SERIAL_CHECK=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v2.0.3
+MAVLink-Anywhere Configuration Script v2.0.4
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
