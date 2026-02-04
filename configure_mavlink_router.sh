@@ -115,7 +115,7 @@ SKIP_SERIAL_CHECK=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v2.0.1
+MAVLink-Anywhere Configuration Script v2.0.3
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -479,6 +479,7 @@ ReportStats=false
 [UartEndpoint uart]
 Device=${uart_device}
 Baud=${uart_baud}
+
 EOF
     else
         sudo bash -c "cat > /etc/mavlink-router/main.conf" <<EOF
@@ -490,6 +491,7 @@ ReportStats=false
 Mode=server
 Address=${input_address}
 Port=${input_port}
+
 EOF
     fi
 
@@ -506,6 +508,7 @@ EOF
 Mode=normal
 Address=${ADDRESS}
 Port=${PORT}
+
 EOF
         INDEX=$((INDEX+1))
     done
@@ -780,6 +783,7 @@ ReportStats=false
 [UartEndpoint uart]
 Device=${UART_DEVICE}
 Baud=${UART_BAUD}
+
 EOF
 
     # Add UDP endpoints
@@ -792,6 +796,7 @@ EOF
 Mode=normal
 Address=$(echo ${ENDPOINT} | cut -d':' -f1)
 Port=$(echo ${ENDPOINT} | cut -d':' -f2)
+
 EOF
         INDEX=$((INDEX+1))
     done

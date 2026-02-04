@@ -1,83 +1,66 @@
 #!/bin/bash
 # =============================================================================
-# MAVLink-Anywhere CLI
+# MAVLink-Anywhere: Unified CLI
 # =============================================================================
-# Version: 2.0.0
-# Description: Main CLI entry point for mavlink-anywhere
+# Version: 2.0.3
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
 #
-# Usage:
-#   mavlink-anywhere <command> [options]
-#
-# Commands:
-#   install     Install mavlink-router from source
-#   configure   Configure mavlink-router
-#   status      Show current status and configuration
-#   test        Test serial connection
-#   start       Start mavlink-router service
-#   stop        Stop mavlink-router service
-#   restart     Restart mavlink-router service
-#   logs        Show mavlink-router logs
-#   uninstall   Remove mavlink-router service
-#   help        Show this help message
+# This is the main entry point for mavlink-anywhere.
+# Usage: mavlink-anywhere <command> [options]
 #
 # =============================================================================
 
 set -e
 
-# Determine script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERSION="2.0.3"
 
-# Source libraries
-LIB_DIR="${SCRIPT_DIR}/lib"
-if [[ -d "$LIB_DIR" ]]; then
-    source "${LIB_DIR}/common.sh"
-    source "${LIB_DIR}/detect.sh"
-    source "${LIB_DIR}/config.sh"
-    source "${LIB_DIR}/service.sh"
-else
-    echo "Error: Library directory not found: $LIB_DIR"
-    echo "Please run this script from the mavlink-anywhere directory."
-    exit 1
+# Source libraries if available
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 fi
 
-# =============================================================================
-# COMMAND HANDLERS
-# =============================================================================
-
-cmd_help() {
-    cat <<EOF
-MAVLink-Anywhere CLI v${MAVLINK_ANYWHERE_VERSION}
-
-A CLI tool for installing and configuring mavlink-router.
+show_help() {
+    cat <<HELPEOF
+MAVLink-Anywhere v${VERSION}
+Stream MAVLink telemetry from your drone to anywhere in the world.
 
 Usage: mavlink-anywhere <command> [options]
 
 Commands:
-  install     Install mavlink-router from source
-  configure   Configure mavlink-router (see configure --help)
-  status      Show current status and configuration
-  test        Test serial/UART connection
-  start       Start mavlink-router service
-  stop        Stop mavlink-router service
-  restart     Restart mavlink-router service
-  logs        Show mavlink-router logs (use -f to follow)
-  uninstall   Remove mavlink-router service configuration
-  help        Show this help message
+  install       Install mavlink-router from source
+  configure     Configure mavlink-router (interactive or headless)
+  status        Show service status and current configuration
+  start         Start the mavlink-router service
+  stop          Stop the mavlink-router service
+  restart       Restart the mavlink-router service
+  logs          Show service logs (-f to follow)
+  test          Test serial connection for MAVLink data
+  uninstall     Remove mavlink-router service
+  version       Show version information
+  help          Show this help message
 
 Examples:
   # Install mavlink-router
   sudo mavlink-anywhere install
 
-  # Auto-configure with GCS IP
+  # Interactive configuration
+  sudo mavlink-anywhere configure
+
+  # Auto mode with GCS IP
   sudo mavlink-anywhere configure --auto --gcs-ip 192.168.1.100
 
-  # Headless configuration for automation
+  # Headless with UART
   sudo mavlink-anywhere configure --headless \\
       --uart /dev/ttyS0 --baud 57600 \\
       --endpoints "127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550"
+
+  # UDP input for SITL
+  sudo mavlink-anywhere configure --headless \\
+      --input-type udp --input-port 14550 \\
+      --endpoints "127.0.0.1:14540,127.0.0.1:14569"
 
   # Check status
   mavlink-anywhere status
@@ -85,344 +68,102 @@ Examples:
   # Follow logs
   mavlink-anywhere logs -f
 
-For more information: https://github.com/alireza787b/mavlink-anywhere
-Video Tutorial: https://www.youtube.com/watch?v=_QEWpoy6HSo
-EOF
+Documentation: https://github.com/alireza787b/mavlink-anywhere
+HELPEOF
 }
 
-cmd_install() {
-    local skip_swap=false
-    local force=false
-
-    # Parse install options
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --skip-swap)
-                skip_swap=true
-                shift
-                ;;
-            --force|-f)
-                force=true
-                shift
-                ;;
-            -h|--help)
-                cat <<EOF
-Usage: mavlink-anywhere install [OPTIONS]
-
-Install mavlink-router from source.
-
-Options:
-  --skip-swap    Skip swap space management
-  --force, -f    Force reinstallation even if already installed
-  -h, --help     Show this help
-
-Note: Installation requires sudo privileges and may take several minutes
-      as it compiles mavlink-router from source.
-EOF
-                return 0
-                ;;
-            *)
-                echo "Unknown option: $1"
-                return 1
-                ;;
-        esac
-    done
-
-    # Check root
-    if ! ma_check_root; then
-        ma_log_error "Installation requires root privileges. Use: sudo mavlink-anywhere install"
-        return 1
-    fi
-
-    # Check if already installed
-    if is_mavlink_router_installed && [[ "$force" != "true" ]]; then
-        ma_log_success "mavlink-router is already installed"
-        ma_log_info "Use --force to reinstall"
-        return 0
-    fi
-
-    # Run the installation script
-    ma_log_step "Running installation script..."
-    bash "${SCRIPT_DIR}/install_mavlink_router.sh"
-}
-
-cmd_configure() {
-    # Pass all arguments to configure script
-    bash "${SCRIPT_DIR}/configure_mavlink_router.sh" "$@"
-}
-
-cmd_status() {
-    ma_print_header "Status"
-
-    # Display service status
-    display_service_status
-
-    # Display serial status
-    display_serial_status
-
-    # Display current configuration if available
-    if [[ -f "$MAVLINK_ROUTER_CONFIG_FILE" ]]; then
-        display_current_config
+show_version() {
+    echo "mavlink-anywhere version ${VERSION}"
+    if command -v mavlink-routerd &>/dev/null; then
+        echo "mavlink-router: $(mavlink-routerd --version 2>&1 | head -1)"
+    else
+        echo "mavlink-router: not installed"
     fi
 }
 
-cmd_test() {
-    local device=""
-    local baud="57600"
-
-    # Parse test options
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --uart|--device)
-                device="$2"
-                shift 2
-                ;;
-            --baud)
-                baud="$2"
-                shift 2
-                ;;
-            -h|--help)
-                cat <<EOF
-Usage: mavlink-anywhere test [OPTIONS]
-
-Test serial/UART connection for MAVLink data.
-
-Options:
-  --uart, --device DEVICE    UART device to test (auto-detected if not specified)
-  --baud RATE                Baud rate (default: 57600)
-  -h, --help                 Show this help
-
-This command attempts to read from the specified serial port and
-reports whether MAVLink data is being received.
-EOF
-                return 0
-                ;;
-            *)
-                echo "Unknown option: $1"
-                return 1
-                ;;
-        esac
-    done
-
-    # Auto-detect device if not specified
-    if [[ -z "$device" ]]; then
-        device=$(detect_uart_device)
-        ma_log_info "Auto-detected UART device: $device"
-    fi
-
-    ma_print_section "Serial Connection Test"
-
-    # Validate device
-    if ! validate_uart_device "$device"; then
-        ma_log_error "Cannot access device: $device"
-        echo ""
-        ma_log_info "Troubleshooting steps:"
-        echo "  1. Check device exists: ls -la $device"
-        echo "  2. Check permissions: sudo usermod -aG dialout \$USER"
-        echo "  3. For Raspberry Pi, ensure UART is enabled in raspi-config"
-        return 1
-    fi
-
-    ma_log_success "Device accessible: $device"
-
-    # Try to read data
-    ma_log_step "Attempting to read data (5 second timeout)..."
-    echo ""
-
-    # Use timeout to read from serial port
-    if ma_command_exists timeout; then
-        local data
-        if data=$(timeout 5 cat "$device" 2>/dev/null | head -c 100 | xxd -p); then
-            if [[ -n "$data" ]]; then
-                ma_log_success "Data received from $device"
-                echo "  First bytes (hex): ${data:0:40}..."
-
-                # Check for MAVLink magic bytes (0xFE for v1, 0xFD for v2)
-                if [[ "$data" == *"fe"* ]] || [[ "$data" == *"fd"* ]]; then
-                    ma_log_success "MAVLink data detected!"
-                else
-                    ma_log_warn "Data received but MAVLink not confirmed"
-                fi
-            else
-                ma_log_warn "No data received within timeout"
-                echo "  - Check that flight controller is connected and powered"
-                echo "  - Verify baud rate matches flight controller ($baud)"
-                echo "  - Ensure MAVLink is enabled on the TELEM port"
-            fi
+# Main command routing
+case "${1:-help}" in
+    install)
+        shift
+        sudo "${SCRIPT_DIR}/install_mavlink_router.sh" "$@"
+        ;;
+    configure|config)
+        shift
+        sudo "${SCRIPT_DIR}/configure_mavlink_router.sh" "$@"
+        ;;
+    status)
+        "${SCRIPT_DIR}/mavlink-router-cli.sh" status
+        ;;
+    start)
+        sudo systemctl start mavlink-router
+        echo "Service started"
+        systemctl status mavlink-router --no-pager
+        ;;
+    stop)
+        sudo systemctl stop mavlink-router
+        echo "Service stopped"
+        ;;
+    restart)
+        sudo systemctl restart mavlink-router
+        echo "Service restarted"
+        systemctl status mavlink-router --no-pager
+        ;;
+    logs|log)
+        shift
+        if [[ "$1" == "-f" || "$1" == "--follow" ]]; then
+            journalctl -u mavlink-router -f
         else
-            ma_log_warn "Could not read from device"
+            lines="${1:-50}"
+            journalctl -u mavlink-router -n "$lines" --no-pager
         fi
-    else
-        ma_log_warn "Cannot perform read test (timeout command not available)"
-    fi
-
-    return 0
-}
-
-cmd_start() {
-    if ! ma_check_root; then
-        ma_log_error "Requires root privileges. Use: sudo mavlink-anywhere start"
-        return 1
-    fi
-    start_service
-}
-
-cmd_stop() {
-    if ! ma_check_root; then
-        ma_log_error "Requires root privileges. Use: sudo mavlink-anywhere stop"
-        return 1
-    fi
-    stop_service
-}
-
-cmd_restart() {
-    if ! ma_check_root; then
-        ma_log_error "Requires root privileges. Use: sudo mavlink-anywhere restart"
-        return 1
-    fi
-    restart_service
-}
-
-cmd_logs() {
-    local follow=false
-    local lines=50
-
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -f|--follow)
-                follow=true
-                shift
-                ;;
-            -n|--lines)
-                lines="$2"
-                shift 2
-                ;;
-            -h|--help)
-                cat <<EOF
-Usage: mavlink-anywhere logs [OPTIONS]
-
-Show mavlink-router service logs.
-
-Options:
-  -f, --follow      Follow log output in real-time
-  -n, --lines N     Show last N lines (default: 50)
-  -h, --help        Show this help
-EOF
-                return 0
-                ;;
-            *)
-                shift
-                ;;
-        esac
-    done
-
-    if [[ "$follow" == "true" ]]; then
-        follow_service_logs
-    else
-        show_service_logs "$lines"
-    fi
-}
-
-cmd_uninstall() {
-    local remove_config=false
-
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --remove-config)
-                remove_config=true
-                shift
-                ;;
-            -h|--help)
-                cat <<EOF
-Usage: mavlink-anywhere uninstall [OPTIONS]
-
-Remove mavlink-router service configuration.
-
-Options:
-  --remove-config   Also remove configuration files
-  -h, --help        Show this help
-
-Note: This removes the systemd service but does not uninstall the
-      mavlink-routerd binary.
-EOF
-                return 0
-                ;;
-            *)
-                shift
-                ;;
-        esac
-    done
-
-    if ! ma_check_root; then
-        ma_log_error "Requires root privileges. Use: sudo mavlink-anywhere uninstall"
-        return 1
-    fi
-
-    ma_log_step "Removing mavlink-router service..."
-
-    # Remove service
-    remove_service
-
-    # Optionally remove config
-    if [[ "$remove_config" == "true" ]]; then
-        ma_log_step "Removing configuration files..."
-        rm -rf /etc/mavlink-router
-        rm -f /etc/default/mavlink-router
-        ma_log_success "Configuration files removed"
-    fi
-
-    ma_log_success "Uninstall complete"
-}
-
-# =============================================================================
-# MAIN
-# =============================================================================
-
-main() {
-    local command="${1:-help}"
-    shift 2>/dev/null || true
-
-    case "$command" in
-        install)
-            cmd_install "$@"
-            ;;
-        configure|config)
-            cmd_configure "$@"
-            ;;
-        status)
-            cmd_status "$@"
-            ;;
-        test)
-            cmd_test "$@"
-            ;;
-        start)
-            cmd_start "$@"
-            ;;
-        stop)
-            cmd_stop "$@"
-            ;;
-        restart)
-            cmd_restart "$@"
-            ;;
-        logs|log)
-            cmd_logs "$@"
-            ;;
-        uninstall|remove)
-            cmd_uninstall "$@"
-            ;;
-        help|--help|-h)
-            cmd_help
-            ;;
-        version|--version|-v)
-            echo "mavlink-anywhere version ${MAVLINK_ANYWHERE_VERSION}"
-            ;;
-        *)
-            echo "Unknown command: $command"
-            echo ""
-            echo "Use 'mavlink-anywhere help' for usage information."
-            exit 1
-            ;;
-    esac
-}
-
-main "$@"
+        ;;
+    test)
+        shift
+        # Test serial connection
+        UART_DEVICE="${1:-}"
+        if [[ -z "$UART_DEVICE" ]]; then
+            # Auto-detect
+            if [[ -e /dev/serial0 ]]; then
+                UART_DEVICE=$(readlink -f /dev/serial0)
+            elif [[ -e /dev/ttyS0 ]]; then
+                UART_DEVICE="/dev/ttyS0"
+            elif [[ -e /dev/ttyUSB0 ]]; then
+                UART_DEVICE="/dev/ttyUSB0"
+            else
+                echo "No serial device found. Specify with: mavlink-anywhere test /dev/ttyXXX"
+                exit 1
+            fi
+        fi
+        echo "Testing serial device: $UART_DEVICE"
+        echo "Press Ctrl+C to stop..."
+        echo ""
+        timeout 10 cat "$UART_DEVICE" | xxd | head -20 || echo "No data received (10s timeout)"
+        ;;
+    uninstall)
+        shift
+        echo "Stopping service..."
+        sudo systemctl stop mavlink-router 2>/dev/null || true
+        sudo systemctl disable mavlink-router 2>/dev/null || true
+        echo "Removing service file..."
+        sudo rm -f /etc/systemd/system/mavlink-router.service
+        sudo systemctl daemon-reload
+        if [[ "$1" == "--remove-config" ]]; then
+            echo "Removing configuration..."
+            sudo rm -rf /etc/mavlink-router
+            sudo rm -f /etc/default/mavlink-router
+        fi
+        echo "Uninstall complete"
+        ;;
+    version|-v|--version)
+        show_version
+        ;;
+    help|-h|--help)
+        show_help
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo ""
+        show_help
+        exit 1
+        ;;
+esac
