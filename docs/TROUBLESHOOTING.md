@@ -285,27 +285,31 @@ ss -ulpn | grep mavlink
 
 ### Can't Connect from QGroundControl
 
+**Quick fix (v3.0.0+):** Your device should have a default server endpoint on port 14550. In QGC, add a UDP connection pointing to `<device-ip>:14550`.
+
 **Checklist:**
 
-1. **Check IP address:**
+1. **Check the gcs_listen endpoint exists:**
    ```bash
-   ip addr show
+   grep -A3 "gcs_listen" /etc/mavlink-router/main.conf
+   ```
+   If missing, re-run: `sudo ./configure_mavlink_router.sh`
+
+2. **Check IP address:**
+   ```bash
+   hostname -I
    ```
 
-2. **Check mavlink-router is running:**
+3. **Check mavlink-router is running:**
    ```bash
-   ./mavlink-anywhere status
-   ```
-
-3. **Check endpoint configuration:**
-   ```bash
-   grep -A3 "UdpEndpoint" /etc/mavlink-router/main.conf
+   sudo systemctl status mavlink-router
    ```
 
 4. **Check firewall:**
    ```bash
    sudo ufw status
-   sudo iptables -L -n
+   # If active, open port 14550:
+   sudo ufw allow 14550/udp
    ```
 
 5. **Test connectivity:**
@@ -411,6 +415,68 @@ sudo ./configure_mavlink_router.sh
 
 ---
 
+## Dashboard Issues
+
+### Dashboard Not Accessible
+
+**Symptom:** `http://<device-ip>:9070` doesn't load.
+
+**Diagnosis:**
+```bash
+# Check if dashboard service is running
+sudo systemctl status mavlink-anywhere-dashboard
+
+# Check what port it's listening on
+ss -tlnp | grep 9070
+
+# View dashboard logs
+sudo journalctl -u mavlink-anywhere-dashboard -n 50
+```
+
+**Solutions:**
+
+1. **Service not installed:**
+   ```bash
+   sudo ./configure_mavlink_router.sh --install-dashboard
+   ```
+
+2. **Binary not downloaded (no internet during setup):**
+   ```bash
+   sudo ./configure_mavlink_router.sh --install-dashboard
+   ```
+
+3. **Firewall blocking port 9070:**
+   ```bash
+   sudo ufw allow 9070/tcp
+   ```
+
+4. **Dashboard binds to localhost only (default):**
+   Access via SSH tunnel:
+   ```bash
+   ssh -L 9070:localhost:9070 user@<device-ip>
+   # Then open http://localhost:9070 in browser
+   ```
+
+### Dashboard Shows Stale Data
+
+**Cause:** Config file was edited externally while dashboard is running.
+
+**Solution:** The dashboard re-reads the config on every API call, so refresh the browser page. If still stale, restart the dashboard:
+```bash
+sudo systemctl restart mavlink-anywhere-dashboard
+```
+
+### Dashboard Uses Too Much Memory
+
+**Solution:** The systemd service has `MemoryMax=30M`. If issues persist on Pi Zero:
+```bash
+# Disable dashboard
+sudo systemctl stop mavlink-anywhere-dashboard
+sudo systemctl disable mavlink-anywhere-dashboard
+```
+
+---
+
 ## Getting Help
 
 If issues persist:
@@ -439,6 +505,7 @@ If issues persist:
 
 ## See Also
 
+- [DASHBOARD.md](DASHBOARD.md) - Web dashboard setup and API reference
 - [UART-SETUP.md](UART-SETUP.md) - Serial port configuration
 - [CLI-REFERENCE.md](CLI-REFERENCE.md) - Command reference
 - [Main README](../README.md) - Project overview

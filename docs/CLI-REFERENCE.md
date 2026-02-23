@@ -76,6 +76,9 @@ This command is an alias for `./configure_mavlink_router.sh`.
 | `--input-type TYPE` | Input type: `uart` or `udp` | uart |
 | `--input-address ADDR` | UDP listen address | 0.0.0.0 |
 | `--input-port PORT` | UDP listen port | 14550 |
+| `--skip-dashboard` | Skip web dashboard installation | - |
+| `--install-dashboard` | Install/update dashboard only | - |
+| `--skip-serial-check` | Skip serial port prerequisite check | - |
 | `--debug` | Enable debug output | - |
 
 **Examples:**
@@ -289,13 +292,13 @@ Endpoints are specified as `IP:PORT` pairs, comma-separated:
 
 ### Standard MDS Endpoints
 
-| Port | Service | Description |
-|------|---------|-------------|
-| 14540 | MAVSDK | MAVSDK SDK connection |
-| 14569 | mavlink2rest | Web-based REST API |
-| 12550 | Local | Local monitoring/debugging |
-| 24550 | GCS (VPN) | Remote ground station over VPN |
-| 14550 | Standard | Standard MAVLink port |
+| Port | Service | Mode | Description |
+|------|---------|------|-------------|
+| 14550 | gcs_listen | Server | Default GCS listen port (any GCS can connect) |
+| 14540 | MAVSDK | Normal | MAVSDK SDK connection |
+| 14569 | mavlink2rest | Normal | Web-based REST API |
+| 12550 | Local | Normal | Local monitoring/debugging |
+| 24550 | GCS (VPN) | Normal | Remote ground station over VPN |
 
 ### Named Shortcuts (in config files)
 
@@ -313,6 +316,7 @@ The following shortcuts are supported:
 | `/etc/mavlink-router/main.conf` | Main mavlink-router configuration |
 | `/etc/default/mavlink-router` | Environment variables |
 | `/etc/systemd/system/mavlink-router.service` | Systemd service file |
+| `/etc/systemd/system/mavlink-anywhere-dashboard.service` | Dashboard service file |
 
 ---
 
@@ -338,6 +342,7 @@ The following shortcuts are supported:
 
 ## See Also
 
+- [DASHBOARD.md](DASHBOARD.md) - Web dashboard setup and API reference
 - [UART-SETUP.md](UART-SETUP.md) - Raspberry Pi serial configuration
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
 - [Main README](../README.md) - Project overview

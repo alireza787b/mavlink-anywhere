@@ -16,7 +16,7 @@ _MAVLINK_COMMON_LOADED=1
 # CONSTANTS
 # =============================================================================
 
-readonly MAVLINK_ANYWHERE_VERSION="2.0.4"
+readonly MAVLINK_ANYWHERE_VERSION="3.0.0"
 readonly MAVLINK_ROUTER_CONFIG_DIR="/etc/mavlink-router"
 readonly MAVLINK_ROUTER_CONFIG_FILE="${MAVLINK_ROUTER_CONFIG_DIR}/main.conf"
 readonly MAVLINK_ROUTER_ENV_FILE="/etc/default/mavlink-router"
@@ -32,6 +32,17 @@ readonly MDS_ENDPOINT_MAVSDK="127.0.0.1:14540"
 readonly MDS_ENDPOINT_MAVLINK2REST="127.0.0.1:14569"
 readonly MDS_ENDPOINT_LOCAL="127.0.0.1:12550"
 readonly MDS_ENDPOINT_GCS_PORT="24550"
+
+# Default server-mode endpoint — any GCS can connect to this device
+readonly MDS_ENDPOINT_GCS_LISTEN_ADDR="0.0.0.0"
+readonly MDS_ENDPOINT_GCS_LISTEN_PORT="14550"
+
+# Dashboard
+readonly DASHBOARD_BINARY_NAME="mavlink-anywhere"
+readonly DASHBOARD_INSTALL_DIR="/opt/mavlink-anywhere"
+readonly DASHBOARD_PORT="9070"
+readonly DASHBOARD_SERVICE="mavlink-anywhere-dashboard"
+readonly DASHBOARD_RELEASES_URL="https://github.com/alireza787b/mavlink-anywhere/releases"
 
 # =============================================================================
 # TERMINAL COLORS

@@ -50,9 +50,21 @@ You should see `active (running)`. Connect your ground station to the configured
 
 ---
 
+### Step 4: Open Dashboard (Optional)
+
+The configure script automatically installs a web dashboard:
+
+```
+http://<your-device-ip>:9070
+```
+
+Manage endpoints, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
+
 ## ✅ That's It!
 
-The configure script handles everything - platform detection, serial setup, and configuration.
+The configure script handles everything - platform detection, serial setup, configuration, and dashboard.
+
+**New in v3.0.0:** Any GCS can now connect to your device on port 14550 out of the box - no IP configuration needed.
 
 ---
 
@@ -60,6 +72,7 @@ The configure script handles everything - platform detection, serial setup, and 
 
 | Guide | Description |
 |-------|-------------|
+| [Web Dashboard](docs/DASHBOARD.md) | Dashboard access, API reference, and configuration |
 | [UART Setup Guide](docs/UART-SETUP.md) | Detailed serial port configuration and wiring |
 | [CLI Reference](docs/CLI-REFERENCE.md) | All command-line options |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |

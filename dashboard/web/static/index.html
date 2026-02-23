@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mavlink-anywhere Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script defer src="alpine.min.js"></script>
+    <script defer src="app.js"></script>
+</head>
+<body x-data="dashboard()" x-init="init()">
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">mavlink-anywhere</h1>
+            <span class="version" x-text="'v' + status.version" x-show="status.version"></span>
+        </div>
+        <div class="header-right">
+            <span class="status-badge" :class="serviceStateClass" x-text="serviceStateLabel"></span>
+            <span class="uptime" x-show="status.service?.uptime" x-text="status.service?.uptime"></span>
+        </div>
+    </header>
+
+    <!-- Board info bar -->
+    <div class="board-bar" x-show="status.board">
+        <span x-text="status.board"></span>
+        <span class="separator">·</span>
+        <span x-text="status.architecture"></span>
+        <span class="separator">·</span>
+        <span x-text="status.hostname"></span>
+    </div>
+
+    <!-- Main content -->
+    <main class="main">
+
+        <!-- Service Control + Input Source row -->
+        <div class="card-row">
+            <!-- Service Control -->
+            <div class="card">
+                <h2 class="card-title">Service Control</h2>
+                <div class="btn-group">
+                    <button class="btn btn-success" @click="serviceAction('start')" :disabled="loading.service">Start</button>
+                    <button class="btn btn-danger" @click="serviceAction('stop')" :disabled="loading.service">Stop</button>
+                    <button class="btn btn-primary" @click="serviceAction('restart')" :disabled="loading.service">Restart</button>
+                </div>
+                <div class="service-info">
+                    <label class="info-label">
+                        <span>Enabled at boot:</span>
+                        <span class="badge" :class="status.service?.enabled ? 'badge-green' : 'badge-gray'"
+                              x-text="status.service?.enabled ? 'Yes' : 'No'"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Input Source -->
+            <div class="card">
+                <h2 class="card-title">Input Source</h2>
+                <div x-show="input">
+                    <template x-if="input?.input?.type === 'UartEndpoint'">
+                        <div class="input-details">
+                            <div class="radio-active">UART</div>
+                            <div class="detail-line">Device: <strong x-text="input.input.device"></strong></div>
+                            <div class="detail-line">Baud: <strong x-text="input.input.baud"></strong></div>
+                        </div>
+                    </template>
+                    <template x-if="input?.input?.type === 'UdpEndpoint'">
+                        <div class="input-details">
+                            <div class="radio-active">UDP</div>
+                            <div class="detail-line">
+                                <span x-text="input.input.address + ':' + input.input.port"></span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!input?.input">
+                        <div class="input-details">
+                            <span class="text-muted">No input configured</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Endpoints -->
+        <div class="card">
+            <div class="card-header-row">
+                <h2 class="card-title">Endpoints</h2>
+                <div class="card-actions">
+                    <button class="btn btn-sm btn-outline" @click="showAddWizard = true">+ Add Endpoint</button>
+                    <button class="btn btn-sm btn-outline" @click="showRawConfig = !showRawConfig"
+                            x-text="showRawConfig ? 'Card View' : 'Raw Config'"></button>
+                </div>
+            </div>
+
+            <!-- Card view -->
+            <div x-show="!showRawConfig">
+                <template x-for="ep in endpointList" :key="ep.name">
+                    <div class="endpoint-card" :class="{'endpoint-disabled': !ep.enabled}">
+                        <div class="endpoint-header">
+                            <span class="endpoint-name" x-text="ep.name"></span>
+                            <span class="mode-badge" :class="ep.mode === 'server' ? 'mode-server' : 'mode-normal'"
+                                  x-text="ep.mode?.toUpperCase() || ep.type"></span>
+                            <span class="status-dot" :class="ep.enabled ? 'dot-green' : 'dot-gray'"></span>
+                            <span class="endpoint-status" x-text="ep.enabled ? 'enabled' : 'disabled'"></span>
+                        </div>
+                        <div class="endpoint-body">
+                            <div class="endpoint-addr" x-show="ep.address">
+                                <span x-text="ep.address + ':' + ep.port"></span>
+                            </div>
+                            <div class="endpoint-addr" x-show="ep.device">
+                                <span x-text="ep.device + ' @ ' + ep.baud"></span>
+                            </div>
+                            <div class="endpoint-desc" x-text="ep.description"></div>
+                        </div>
+                        <div class="endpoint-actions" x-show="ep.type !== 'UartEndpoint'">
+                            <button class="btn btn-xs btn-outline" @click="editEndpoint(ep)">edit</button>
+                            <button class="btn btn-xs btn-outline"
+                                    @click="toggleEp(ep)"
+                                    x-text="ep.enabled ? 'disable' : 'enable'"></button>
+                            <button class="btn btn-xs btn-danger-outline" x-show="ep.removable"
+                                    @click="deleteEp(ep)">delete</button>
+                        </div>
+                    </div>
+                </template>
+                <div class="empty-state" x-show="endpointList.length === 0">
+                    No endpoints configured.
+                </div>
+            </div>
+
+            <!-- Raw config view -->
+            <div x-show="showRawConfig">
+                <textarea class="raw-config" x-model="rawConfig" rows="20"></textarea>
+                <div class="raw-config-actions">
+                    <button class="btn btn-primary" @click="saveRawConfig()" :disabled="loading.config">Save Config</button>
+                    <button class="btn btn-outline" @click="loadConfig()">Reload</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Endpoint Wizard Modal -->
+        <div class="modal-overlay" x-show="showAddWizard" @click.self="showAddWizard = false" x-cloak>
+            <div class="modal">
+                <h2 class="modal-title">Add Endpoint</h2>
+
+                <!-- Step 1: Choose type -->
+                <div x-show="wizardStep === 1">
+                    <p class="wizard-label">What kind of endpoint?</p>
+                    <div class="wizard-options">
+                        <template x-for="tpl in templates" :key="tpl.id">
+                            <label class="wizard-option" :class="{'wizard-option-selected': wizardType === tpl.id}">
+                                <input type="radio" name="ep-type" :value="tpl.id" x-model="wizardType">
+                                <div>
+                                    <strong x-text="tpl.label"></strong>
+                                    <span class="wizard-option-desc" x-text="tpl.description"></span>
+                                </div>
+                            </label>
+                        </template>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-outline" @click="showAddWizard = false">Cancel</button>
+                        <button class="btn btn-primary" @click="wizardStep = 2" :disabled="!wizardType">Next</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Details -->
+                <div x-show="wizardStep === 2">
+                    <p class="wizard-info" x-text="selectedTemplate?.infoText"></p>
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" x-model="wizardName" placeholder="e.g. gcs_home" class="input">
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <input type="text" x-model="wizardAddr" :placeholder="selectedTemplate?.defaultAddress" class="input">
+                    </div>
+                    <div class="form-group">
+                        <label>Port</label>
+                        <input type="number" x-model.number="wizardPort" :placeholder="selectedTemplate?.defaultPort" class="input">
+                    </div>
+                    <div class="form-group" x-show="selectedTemplate?.mode === 'normal' || wizardType === 'custom'">
+                        <label>Mode</label>
+                        <select x-model="wizardMode" class="input">
+                            <option value="normal">Normal (push to target)</option>
+                            <option value="server">Server (listen for connections)</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-outline" @click="wizardStep = 1">Back</button>
+                        <button class="btn btn-primary" @click="wizardStep = 3">Preview</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Preview & Confirm -->
+                <div x-show="wizardStep === 3">
+                    <p class="wizard-label">Config preview:</p>
+                    <pre class="config-preview" x-text="wizardPreview"></pre>
+                    <div class="modal-actions">
+                        <button class="btn btn-outline" @click="wizardStep = 2">Back</button>
+                        <button class="btn btn-success" @click="submitWizard()" :disabled="loading.add">
+                            Add & Restart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Endpoint Modal -->
+        <div class="modal-overlay" x-show="showEditModal" @click.self="showEditModal = false" x-cloak>
+            <div class="modal">
+                <h2 class="modal-title">Edit Endpoint: <span x-text="editingEp?.name"></span></h2>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" x-model="editAddr" class="input">
+                </div>
+                <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" x-model.number="editPort" class="input">
+                </div>
+                <div class="form-group">
+                    <label>Mode</label>
+                    <select x-model="editMode" class="input">
+                        <option value="normal">Normal</option>
+                        <option value="server">Server</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-outline" @click="showEditModal = false">Cancel</button>
+                    <button class="btn btn-primary" @click="saveEdit()" :disabled="loading.edit">Save & Restart</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Logs -->
+        <div class="card">
+            <div class="card-header-row">
+                <h2 class="card-title">Live Logs</h2>
+                <div class="card-actions">
+                    <button class="btn btn-sm btn-outline" @click="toggleLogs()"
+                            x-text="logsPaused ? 'Resume' : 'Pause'"></button>
+                    <button class="btn btn-sm btn-outline" @click="clearLogs()">Clear</button>
+                </div>
+            </div>
+            <div class="log-container" x-ref="logContainer">
+                <template x-for="(line, i) in logLines" :key="i">
+                    <div class="log-line" x-text="line"></div>
+                </template>
+                <div class="empty-state" x-show="logLines.length === 0">
+                    No log data. Service may not be running.
+                </div>
+            </div>
+        </div>
+
+        <!-- System Info -->
+        <div class="card">
+            <h2 class="card-title">System Info</h2>
+            <div class="system-grid" x-show="systemInfo?.board">
+                <div class="system-item">
+                    <span class="system-label">Board</span>
+                    <span x-text="systemInfo.board?.boardDescription || 'Unknown'"></span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">Arch</span>
+                    <span x-text="systemInfo.board?.architecture"></span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">UART</span>
+                    <span x-text="systemInfo.board?.uartEnabled || 'unknown'"></span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">Console</span>
+                    <span :class="systemInfo.board?.serialConsole === 'disabled' ? 'text-green' : 'text-warn'"
+                          x-text="(systemInfo.board?.serialConsole || 'unknown') + (systemInfo.board?.serialConsole === 'disabled' ? ' (good)' : '')"></span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">Firewall</span>
+                    <span x-text="(systemInfo.firewall?.type || 'none') + ' (' + (systemInfo.firewall?.status || 'none') + ')'"></span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">RAM</span>
+                    <span x-text="systemInfo.board?.totalRam || 'unknown'"></span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toast notifications -->
+    <div class="toast-container">
+        <template x-for="(toast, i) in toasts" :key="i">
+            <div class="toast" :class="'toast-' + toast.type" x-text="toast.message"
+                 x-show="toast.visible"
+                 x-transition.duration.300ms></div>
+        </template>
+    </div>
+
+</body>
+</html>

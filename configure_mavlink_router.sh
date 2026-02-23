@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 2.0.3
+# Version: 3.0.0
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -44,6 +44,7 @@ if [[ -d "$LIB_DIR" ]]; then
     source "${LIB_DIR}/detect.sh" 2>/dev/null || true
     source "${LIB_DIR}/config.sh" 2>/dev/null || true
     source "${LIB_DIR}/service.sh" 2>/dev/null || true
+    source "${LIB_DIR}/dashboard.sh" 2>/dev/null || true
     LIBS_LOADED=true
 else
     LIBS_LOADED=false
@@ -112,10 +113,12 @@ INPUT_ADDRESS="0.0.0.0"
 INPUT_PORT="14550"
 SHOW_HELP=false
 SKIP_SERIAL_CHECK=false
+SKIP_DASHBOARD=false
+INSTALL_DASHBOARD_ONLY=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v2.0.4
+MAVLink-Anywhere Configuration Script v3.0.0
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -136,6 +139,10 @@ UDP Input Options (no serial port needed):
 Endpoint Options:
   --endpoints LIST  Comma-separated endpoints (e.g., "127.0.0.1:14540,192.168.1.100:24550")
   --gcs-ip IP       GCS IP address (adds endpoint on port 24550)
+
+Dashboard:
+  --skip-dashboard     Skip web dashboard installation
+  --install-dashboard  Install/update dashboard only (no router reconfig)
 
 Other:
   --skip-serial-check  Skip serial port prerequisite check
@@ -208,6 +215,14 @@ while [[ $# -gt 0 ]]; do
             SKIP_SERIAL_CHECK=true
             shift
             ;;
+        --skip-dashboard)
+            SKIP_DASHBOARD=true
+            shift
+            ;;
+        --install-dashboard)
+            INSTALL_DASHBOARD_ONLY=true
+            shift
+            ;;
         --debug)
             MA_DEBUG=true
             shift
@@ -226,6 +241,17 @@ done
 
 if [[ "$SHOW_HELP" == "true" ]]; then
     show_help
+    exit 0
+fi
+
+# Handle --install-dashboard (standalone: install/update dashboard only)
+if [[ "$INSTALL_DASHBOARD_ONLY" == "true" ]]; then
+    if [[ "$LIBS_LOADED" == "true" ]] && type install_dashboard &>/dev/null; then
+        install_dashboard
+    else
+        echo "Dashboard library not available. Ensure lib/dashboard.sh exists."
+        exit 1
+    fi
     exit 0
 fi
 
@@ -480,6 +506,13 @@ ReportStats=false
 Device=${uart_device}
 Baud=${uart_baud}
 
+# Default server-mode endpoint — any GCS can connect to this device on port 14550
+# QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port 14550
+[UdpEndpoint gcs_listen]
+Mode=server
+Address=0.0.0.0
+Port=14550
+
 EOF
     else
         sudo bash -c "cat > /etc/mavlink-router/main.conf" <<EOF
@@ -493,6 +526,17 @@ Address=${input_address}
 Port=${input_port}
 
 EOF
+        # Only add gcs_listen if input port is different from 14550
+        if [[ "${input_port}" != "14550" ]]; then
+            sudo bash -c "cat >> /etc/mavlink-router/main.conf" <<EOF
+# Default server-mode endpoint — any GCS can connect to this device on port 14550
+[UdpEndpoint gcs_listen]
+Mode=server
+Address=0.0.0.0
+Port=14550
+
+EOF
+        fi
     fi
 
     # Add UDP endpoints
@@ -784,6 +828,13 @@ ReportStats=false
 Device=${UART_DEVICE}
 Baud=${UART_BAUD}
 
+# Default server-mode endpoint — any GCS can connect to this device on port 14550
+# QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port 14550
+[UdpEndpoint gcs_listen]
+Mode=server
+Address=0.0.0.0
+Port=14550
+
 EOF
 
     # Add UDP endpoints
@@ -865,6 +916,19 @@ EOF
     echo ""
     fi
     echo "================================================================="
-    echo "Connect QGroundControl to this device's IP on the configured UDP ports."
+    echo "Connect QGroundControl to this device's IP on port 14550 (no config needed)."
+    echo "Or push to a specific GCS using configured endpoints."
     echo "================================================================="
+fi
+
+# =============================================================================
+# DASHBOARD INSTALLATION (after router configuration, non-blocking)
+# =============================================================================
+# Dashboard install is best-effort — failure never blocks mavlink-router setup.
+# Users can skip with --skip-dashboard or install later with --install-dashboard.
+
+if [[ "$SKIP_DASHBOARD" != "true" ]] && [[ "$INSTALL_DASHBOARD_ONLY" != "true" ]]; then
+    if [[ "$LIBS_LOADED" == "true" ]] && type install_dashboard &>/dev/null; then
+        install_dashboard || true  # Non-fatal: dashboard is optional
+    fi
 fi

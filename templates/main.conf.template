@@ -31,7 +31,19 @@ Baud=${UART_BAUD}
 # Port=${INPUT_PORT}
 
 # =============================================================================
-# OUTPUT ENDPOINTS
+# GCS LISTEN ENDPOINT (Server Mode)
+# =============================================================================
+# Any GCS on the network can connect TO this device on port 14550.
+# QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port 14550
+# No pre-configuration needed on this device — just point your GCS here.
+
+[UdpEndpoint gcs_listen]
+Mode=server
+Address=0.0.0.0
+Port=14550
+
+# =============================================================================
+# OUTPUT ENDPOINTS (Normal Mode — push to specific targets)
 # =============================================================================
 # Add UDP endpoints for each application that needs MAVLink data
 

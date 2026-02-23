@@ -1,0 +1,70 @@
+name: Dashboard Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: arm
+            goarm: "6"
+            suffix: linux-arm6
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build dashboard binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: "0"
+        run: |
+          cd dashboard
+          VERSION="${GITHUB_REF_NAME:-dev}"
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          go build -ldflags "-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
+            -o "../mavlink-anywhere-${{ matrix.suffix }}" ./cmd/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mavlink-anywhere-${{ matrix.suffix }}
+          path: mavlink-anywhere-${{ matrix.suffix }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            mavlink-anywhere-linux-arm6/mavlink-anywhere-linux-arm6
+            mavlink-anywhere-linux-arm64/mavlink-anywhere-linux-arm64
+            mavlink-anywhere-linux-amd64/mavlink-anywhere-linux-amd64
+          generate_release_notes: true

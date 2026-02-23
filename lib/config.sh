@@ -82,6 +82,20 @@ Port=${port}
 EOF
 }
 
+# Generate the default GCS listen endpoint (server mode on 14550)
+# Any GCS can connect TO this device — no IP pre-configuration needed.
+generate_gcs_listen_endpoint() {
+    cat <<EOF
+# Default server-mode endpoint — any GCS can connect to this device on port ${MDS_ENDPOINT_GCS_LISTEN_PORT}
+# QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port ${MDS_ENDPOINT_GCS_LISTEN_PORT}
+[UdpEndpoint gcs_listen]
+Mode=server
+Address=${MDS_ENDPOINT_GCS_LISTEN_ADDR}
+Port=${MDS_ENDPOINT_GCS_LISTEN_PORT}
+
+EOF
+}
+
 # Parse endpoint string and generate appropriate config section
 # Supports formats: IP:PORT or named shortcuts
 parse_and_generate_endpoint() {
@@ -132,28 +146,23 @@ generate_uart_config() {
     local uart_baud="$2"
     local endpoints="$3"  # Comma-separated list
 
-    local config=""
-
-    # Header
-    config+=$(generate_config_header)
-
-    # UART endpoint
-    config+=$(generate_uart_endpoint "$uart_device" "$uart_baud")
-
-    # Parse and add UDP endpoints
-    local endpoint_array
-    IFS=',' read -ra endpoint_array <<< "$endpoints"
-
-    local index=1
-    for endpoint in "${endpoint_array[@]}"; do
-        endpoint=$(echo "$endpoint" | tr -d ' ')  # Trim whitespace
-        if [[ -n "$endpoint" ]]; then
-            config+=$(parse_and_generate_endpoint "$endpoint" "$index")
-            ((index++))
-        fi
-    done
-
-    echo "$config"
+    # Use a subshell with direct output to preserve newlines
+    {
+        generate_config_header
+        generate_uart_endpoint "$uart_device" "$uart_baud"
+        generate_gcs_listen_endpoint
+        # Parse and add UDP endpoints
+        local endpoint_array
+        IFS=',' read -ra endpoint_array <<< "$endpoints"
+        local index=1
+        for endpoint in "${endpoint_array[@]}"; do
+            endpoint=$(echo "$endpoint" | tr -d ' ')
+            if [[ -n "$endpoint" ]]; then
+                parse_and_generate_endpoint "$endpoint" "$index"
+                ((index++))
+            fi
+        done
+    }
 }
 
 # Generate complete configuration for UDP input
@@ -162,28 +171,27 @@ generate_udp_input_config() {
     local input_port="$2"
     local endpoints="$3"  # Comma-separated list
 
-    local config=""
+    {
+        generate_config_header
+        generate_udp_server_endpoint "$input_address" "$input_port" "input"
 
-    # Header
-    config+=$(generate_config_header)
-
-    # UDP input (server mode)
-    config+=$(generate_udp_server_endpoint "$input_address" "$input_port" "input")
-
-    # Parse and add output UDP endpoints
-    local endpoint_array
-    IFS=',' read -ra endpoint_array <<< "$endpoints"
-
-    local index=1
-    for endpoint in "${endpoint_array[@]}"; do
-        endpoint=$(echo "$endpoint" | tr -d ' ')  # Trim whitespace
-        if [[ -n "$endpoint" ]]; then
-            config+=$(parse_and_generate_endpoint "$endpoint" "$index")
-            ((index++))
+        # Default GCS listen endpoint (only if input port differs from GCS listen port)
+        if [[ "$input_port" != "${MDS_ENDPOINT_GCS_LISTEN_PORT}" ]]; then
+            generate_gcs_listen_endpoint
         fi
-    done
 
-    echo "$config"
+        # Parse and add output UDP endpoints
+        local endpoint_array
+        IFS=',' read -ra endpoint_array <<< "$endpoints"
+        local index=1
+        for endpoint in "${endpoint_array[@]}"; do
+            endpoint=$(echo "$endpoint" | tr -d ' ')
+            if [[ -n "$endpoint" ]]; then
+                parse_and_generate_endpoint "$endpoint" "$index"
+                ((index++))
+            fi
+        done
+    }
 }
 
 # =============================================================================
