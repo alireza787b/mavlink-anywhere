@@ -52,13 +52,14 @@ You should see `active (running)`. Connect your ground station to the configured
 
 ### Step 4: Open Dashboard (Optional)
 
-The configure script automatically installs a web dashboard:
+The configure script automatically installs a web dashboard bound to localhost by default:
 
 ```
-http://<your-device-ip>:9070
+http://127.0.0.1:9070
 ```
 
 Manage endpoints, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
+To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
 
 ## ✅ That's It!
 
@@ -188,13 +189,11 @@ For internet streaming, you need:
 
 ---
 
-## 🤝 MDS Integration
+## Integrations
 
-Integrates with [MAVSDK Drone Show](https://github.com/alireza787b/mavsdk_drone_show):
+`mavlink-anywhere` is intentionally generic. It sets up a MAVLink router, a default GCS listen endpoint, and optional local service endpoints. Higher-level projects can automate it by passing explicit CLI arguments or by managing `/etc/mavlink-router/main.conf`.
 
-```bash
-sudo ./tools/mds_init.sh -d 1 -y --mavlink-auto --gcs-ip 100.96.32.75
-```
+One example integration is [MAVSDK Drone Show](https://github.com/alireza787b/mavsdk_drone_show), but this repository does not assume MDS-specific defaults.
 
 ---
 
@@ -216,5 +215,5 @@ MIT License - Copyright (c) 2024 Alireza Ghaderi
   <b>Made with ❤️ for the drone community</b><br>
   <a href="https://github.com/alireza787b/mavlink-anywhere">GitHub</a> •
   <a href="https://www.youtube.com/watch?v=_QEWpoy6HSo">Tutorial</a> •
-  <a href="https://github.com/alireza787b/mavsdk_drone_show">MDS</a>
+  <a href="docs/DASHBOARD.md">Dashboard Docs</a>
 </p>

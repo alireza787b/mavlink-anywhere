@@ -72,6 +72,19 @@ function dashboard() {
             return `[UdpEndpoint ${name}]\nMode=${mode}\nAddress=${addr}\nPort=${port}`;
         },
 
+        endpointModeLabel(ep) {
+            if (ep.type === 'UartEndpoint') return 'UART';
+            if (ep.mode === 'server') return 'SERVER';
+            if (ep.mode === 'normal') return 'NORMAL';
+            if (ep.type === 'UdpEndpoint') return 'UDP';
+            return ep.type || 'ENDPOINT';
+        },
+
+        endpointModeClass(ep) {
+            if (ep.mode === 'server') return 'mode-server';
+            return 'mode-normal';
+        },
+
         // Initialization
         async init() {
             await Promise.all([
@@ -330,3 +343,25 @@ function dashboard() {
         },
     };
 }
+
+let dashboardRegistered = false;
+
+function registerDashboardComponent() {
+    if (dashboardRegistered) return;
+    if (typeof window === 'undefined') return;
+    if (!window.Alpine || typeof window.Alpine.data !== 'function') return;
+
+    window.Alpine.data('dashboard', dashboard);
+    window.dashboard = dashboard;
+    dashboardRegistered = true;
+}
+
+if (typeof window !== 'undefined') {
+    window.dashboard = dashboard;
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('alpine:init', registerDashboardComponent, { once: true });
+}
+
+registerDashboardComponent();

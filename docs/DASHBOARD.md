@@ -4,13 +4,18 @@ The web dashboard provides a browser-based interface for monitoring and managing
 
 ## Quick Access
 
-After running `configure_mavlink_router.sh`, the dashboard is automatically installed and available at:
+After running `configure_mavlink_router.sh`, the dashboard is automatically installed and bound to localhost by default:
 
 ```
-http://<your-device-ip>:9070
+http://127.0.0.1:9070
 ```
 
-Find your device IP: `hostname -I`
+For network access, expose it explicitly:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070
+```
 
 ## Features
 
@@ -53,6 +58,13 @@ sudo ./configure_mavlink_router.sh --skip-dashboard
 
 ```bash
 sudo ./configure_mavlink_router.sh --install-dashboard
+```
+
+### Install/Update Dashboard and Expose on Network
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070
 ```
 
 ### Manual
@@ -104,15 +116,14 @@ sudo systemctl disable mavlink-anywhere-dashboard
 
 | Access | Auth Required | Rationale |
 |--------|--------------|-----------|
-| `localhost:9070` (default) | None | Same trust level as SSH |
-| `0.0.0.0:9070` (network) | Token (planned) | Required for non-local access |
+| `127.0.0.1:9070` (default) | None | Same trust level as SSH |
+| `0.0.0.0:9070` (explicit) | None | Use only on trusted networks, VPNs, or behind SSH tunneling |
 
 The dashboard binds to `127.0.0.1` by default — it's only accessible from the device itself or via SSH tunnel. To expose it on the network:
 
 ```bash
-# Edit the service to listen on all interfaces
-sudo systemctl edit mavlink-anywhere-dashboard
-# Add: ExecStart=/opt/mavlink-anywhere/mavlink-anywhere --listen 0.0.0.0:9070
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070
 ```
 
 ## GCS Server Endpoint (Port 14550)
@@ -172,6 +183,13 @@ ss -tlnp | grep 9070
 
 # View dashboard logs
 sudo journalctl -u mavlink-anywhere-dashboard -f
+```
+
+If the service is bound to localhost only, use SSH tunneling:
+
+```bash
+ssh -L 9070:localhost:9070 user@<device-ip>
+# Then open http://127.0.0.1:9070 locally
 ```
 
 **Dashboard shows "No endpoints":**

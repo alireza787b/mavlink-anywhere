@@ -419,7 +419,7 @@ sudo ./configure_mavlink_router.sh
 
 ### Dashboard Not Accessible
 
-**Symptom:** `http://<device-ip>:9070` doesn't load.
+**Symptom:** The dashboard doesn't load where you expect it to.
 
 **Diagnosis:**
 ```bash
@@ -455,6 +455,12 @@ sudo journalctl -u mavlink-anywhere-dashboard -n 50
    ```bash
    ssh -L 9070:localhost:9070 user@<device-ip>
    # Then open http://localhost:9070 in browser
+   ```
+
+5. **Dashboard was never exposed on the network:**
+   ```bash
+   sudo ./configure_mavlink_router.sh --install-dashboard \
+       --dashboard-listen 0.0.0.0:9070
    ```
 
 ### Dashboard Shows Stale Data

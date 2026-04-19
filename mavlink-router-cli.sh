@@ -85,7 +85,7 @@ edit_endpoints() {
 
     echo "Current UDP endpoints: ${UDP_ENDPOINTS}"
     echo ""
-    echo "Enter new endpoints (space-separated, e.g., '127.0.0.1:14550 192.168.1.100:14550'):"
+    echo "Enter new endpoints (comma-separated, e.g., '127.0.0.1:14550,192.168.1.100:14550'):"
     read -p "New endpoints: " NEW_ENDPOINTS
 
     if [[ -z "$NEW_ENDPOINTS" ]]; then
@@ -105,7 +105,7 @@ edit_endpoints() {
         sudo "${SCRIPT_DIR}/configure_mavlink_router.sh" --headless \
             --uart "${UART_DEVICE:-/dev/ttyS0}" \
             --baud "${UART_BAUD:-57600}" \
-            --endpoints "${NEW_ENDPOINTS// /,}"
+            --endpoints "${NEW_ENDPOINTS}"
     else
         echo "Configuration script not found. Please edit $CONFIG_FILE manually."
     fi

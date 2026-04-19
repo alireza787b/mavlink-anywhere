@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Common Utilities
 # =============================================================================
-# Version: 2.0.1
+# Version: 3.0.1
 # Description: Core utilities - colors, logging, shared functions
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -16,7 +16,7 @@ _MAVLINK_COMMON_LOADED=1
 # CONSTANTS
 # =============================================================================
 
-readonly MAVLINK_ANYWHERE_VERSION="3.0.0"
+readonly MAVLINK_ANYWHERE_VERSION="3.0.1"
 readonly MAVLINK_ROUTER_CONFIG_DIR="/etc/mavlink-router"
 readonly MAVLINK_ROUTER_CONFIG_FILE="${MAVLINK_ROUTER_CONFIG_DIR}/main.conf"
 readonly MAVLINK_ROUTER_ENV_FILE="/etc/default/mavlink-router"
@@ -27,15 +27,15 @@ readonly DEFAULT_UART_DEVICE="/dev/ttyS0"
 readonly DEFAULT_UART_BAUD="57600"
 readonly DEFAULT_UDP_PORT="14550"
 
-# Standard MDS endpoints
-readonly MDS_ENDPOINT_MAVSDK="127.0.0.1:14540"
-readonly MDS_ENDPOINT_MAVLINK2REST="127.0.0.1:14569"
-readonly MDS_ENDPOINT_LOCAL="127.0.0.1:12550"
-readonly MDS_ENDPOINT_GCS_PORT="24550"
+# Standard default endpoints
+readonly DEFAULT_ENDPOINT_MAVSDK="127.0.0.1:14540"
+readonly DEFAULT_ENDPOINT_MAVLINK2REST="127.0.0.1:14569"
+readonly DEFAULT_ENDPOINT_LOCAL="127.0.0.1:12550"
+readonly DEFAULT_REMOTE_GCS_PORT="24550"
 
 # Default server-mode endpoint — any GCS can connect to this device
-readonly MDS_ENDPOINT_GCS_LISTEN_ADDR="0.0.0.0"
-readonly MDS_ENDPOINT_GCS_LISTEN_PORT="14550"
+readonly DEFAULT_GCS_LISTEN_ADDR="0.0.0.0"
+readonly DEFAULT_GCS_LISTEN_PORT="14550"
 
 # Dashboard
 readonly DASHBOARD_BINARY_NAME="mavlink-anywhere"
@@ -275,9 +275,19 @@ ma_confirm() {
     [[ "${yn,,}" == "y" || "${yn,,}" == "yes" ]]
 }
 
-# Parse comma-separated endpoints into array
-ma_parse_endpoints() {
+# Normalize comma- or whitespace-separated endpoints into a comma-separated list
+ma_normalize_endpoints() {
     local endpoints_str="$1"
+
+    printf '%s' "$endpoints_str" \
+        | tr '\n' ',' \
+        | sed -E 's/[[:space:]]+/,/g; s/,+/,/g; s/^,+//; s/,+$//'
+}
+
+# Parse comma- or whitespace-separated endpoints into array
+ma_parse_endpoints() {
+    local endpoints_str
+    endpoints_str=$(ma_normalize_endpoints "$1")
     local -n result_array=$2
 
     IFS=',' read -ra result_array <<< "$endpoints_str"
@@ -288,16 +298,25 @@ ma_parse_endpoints() {
     done
 }
 
-# Build default MDS endpoints string
-ma_get_mds_endpoints() {
+# Build the default local service endpoint list
+ma_get_standard_endpoints() {
     local gcs_ip="${1:-}"
-    local endpoints="${MDS_ENDPOINT_MAVSDK},${MDS_ENDPOINT_MAVLINK2REST},${MDS_ENDPOINT_LOCAL}"
+    local endpoints="${DEFAULT_ENDPOINT_MAVSDK},${DEFAULT_ENDPOINT_MAVLINK2REST},${DEFAULT_ENDPOINT_LOCAL}"
 
     if [[ -n "$gcs_ip" ]]; then
-        endpoints="${endpoints},${gcs_ip}:${MDS_ENDPOINT_GCS_PORT}"
+        endpoints="${endpoints},${gcs_ip}:${DEFAULT_REMOTE_GCS_PORT}"
     fi
 
     echo "$endpoints"
+}
+
+# Backward-compatible aliases for older wrappers.
+ma_get_default_endpoints() {
+    ma_get_standard_endpoints "$@"
+}
+
+ma_get_mds_endpoints() {
+    ma_get_standard_endpoints "$@"
 }
 
 # =============================================================================

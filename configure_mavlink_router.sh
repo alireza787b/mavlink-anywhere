@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.0
+# Version: 3.0.1
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -115,10 +115,11 @@ SHOW_HELP=false
 SKIP_SERIAL_CHECK=false
 SKIP_DASHBOARD=false
 INSTALL_DASHBOARD_ONLY=false
+DASHBOARD_LISTEN=""
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.0
+MAVLink-Anywhere Configuration Script v3.0.1
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -143,6 +144,7 @@ Endpoint Options:
 Dashboard:
   --skip-dashboard     Skip web dashboard installation
   --install-dashboard  Install/update dashboard only (no router reconfig)
+  --dashboard-listen   Dashboard listen address (default: 127.0.0.1:9070)
 
 Other:
   --skip-serial-check  Skip serial port prerequisite check
@@ -168,6 +170,10 @@ Examples:
   sudo ./configure_mavlink_router.sh --headless \\
       --input-type udp --input-port 14550 \\
       --endpoints "127.0.0.1:14540,127.0.0.1:14569"
+
+  # Expose dashboard on the network
+  sudo ./configure_mavlink_router.sh --install-dashboard \\
+      --dashboard-listen 0.0.0.0:9070
 
 Documentation: https://github.com/alireza787b/mavlink-anywhere
 EOF
@@ -223,6 +229,10 @@ while [[ $# -gt 0 ]]; do
             INSTALL_DASHBOARD_ONLY=true
             shift
             ;;
+        --dashboard-listen)
+            DASHBOARD_LISTEN="$2"
+            shift 2
+            ;;
         --debug)
             MA_DEBUG=true
             shift
@@ -247,7 +257,7 @@ fi
 # Handle --install-dashboard (standalone: install/update dashboard only)
 if [[ "$INSTALL_DASHBOARD_ONLY" == "true" ]]; then
     if [[ "$LIBS_LOADED" == "true" ]] && type install_dashboard &>/dev/null; then
-        install_dashboard
+        install_dashboard "${DASHBOARD_LISTEN:-127.0.0.1:9070}"
     else
         echo "Dashboard library not available. Ensure lib/dashboard.sh exists."
         exit 1
@@ -657,13 +667,22 @@ elif [[ "$AUTO_MODE" == "true" ]]; then
     # Handle UDP mode if switched
     if [[ "$INPUT_TYPE" == "udp" ]]; then
         echo "Input: UDP on port ${INPUT_PORT}"
-        [[ -z "$ENDPOINTS" ]] && ENDPOINTS="127.0.0.1:14540,127.0.0.1:14569,127.0.0.1:12550"
+        if [[ -z "$ENDPOINTS" ]]; then
+            if [[ "$LIBS_LOADED" == "true" ]] && type ma_get_standard_endpoints &>/dev/null; then
+                ENDPOINTS=$(ma_get_standard_endpoints)
+            else
+                ENDPOINTS="127.0.0.1:14540,127.0.0.1:14569,127.0.0.1:12550"
+            fi
+        fi
 
         if [[ -n "$GCS_IP" ]]; then
             ENDPOINTS="${ENDPOINTS},${GCS_IP}:24550"
         else
             read -p "Enter GCS IP address (or press Enter to skip): " GCS_IP
             [[ -n "$GCS_IP" ]] && ENDPOINTS="${ENDPOINTS},${GCS_IP}:24550"
+        fi
+        if [[ "$LIBS_LOADED" == "true" ]] && type ma_normalize_endpoints &>/dev/null; then
+            ENDPOINTS=$(ma_normalize_endpoints "$ENDPOINTS")
         fi
 
         echo "Endpoints: $ENDPOINTS"
@@ -700,7 +719,11 @@ elif [[ "$AUTO_MODE" == "true" ]]; then
         echo "Baud rate: $UART_BAUD"
 
         # Build endpoints list
-        ENDPOINTS="127.0.0.1:14540,127.0.0.1:14569,127.0.0.1:12550"
+        if [[ "$LIBS_LOADED" == "true" ]] && type ma_get_standard_endpoints &>/dev/null; then
+            ENDPOINTS=$(ma_get_standard_endpoints)
+        else
+            ENDPOINTS="127.0.0.1:14540,127.0.0.1:14569,127.0.0.1:12550"
+        fi
 
         if [[ -n "$GCS_IP" ]]; then
             ENDPOINTS="${ENDPOINTS},${GCS_IP}:24550"
@@ -708,6 +731,9 @@ elif [[ "$AUTO_MODE" == "true" ]]; then
         else
             read -p "Enter GCS IP address (or press Enter to skip): " GCS_IP
             [[ -n "$GCS_IP" ]] && ENDPOINTS="${ENDPOINTS},${GCS_IP}:24550"
+        fi
+        if [[ "$LIBS_LOADED" == "true" ]] && type ma_normalize_endpoints &>/dev/null; then
+            ENDPOINTS=$(ma_normalize_endpoints "$ENDPOINTS")
         fi
 
         echo "Endpoints: $ENDPOINTS"
@@ -757,7 +783,16 @@ else
         INPUT_PORT=${INPUT_PORT:-14550}
 
         read -p "Enter UDP endpoints (comma-separated, e.g., 127.0.0.1:14540,192.168.1.100:24550): " ENDPOINTS
-        ENDPOINTS=${ENDPOINTS:-"127.0.0.1:14540,127.0.0.1:14569"}
+        if [[ -z "$ENDPOINTS" ]]; then
+            if [[ "$LIBS_LOADED" == "true" ]] && type ma_get_standard_endpoints &>/dev/null; then
+                ENDPOINTS=$(ma_get_standard_endpoints)
+            else
+                ENDPOINTS="127.0.0.1:14540,127.0.0.1:14569,127.0.0.1:12550"
+            fi
+        fi
+        if [[ "$LIBS_LOADED" == "true" ]] && type ma_normalize_endpoints &>/dev/null; then
+            ENDPOINTS=$(ma_normalize_endpoints "$ENDPOINTS")
+        fi
 
         if [[ "$LIBS_LOADED" == "true" ]]; then
             configure_udp_headless "$INPUT_ADDRESS" "$INPUT_PORT" "$ENDPOINTS"
@@ -782,12 +817,21 @@ else
         source /etc/default/mavlink-router 2>/dev/null || true
         CFG_UART_DEVICE=${UART_DEVICE:-/dev/ttyS0}
         CFG_UART_BAUD=${UART_BAUD:-57600}
-        CFG_UDP_ENDPOINTS=${UDP_ENDPOINTS:-0.0.0.0:14550}
+        if [[ "$LIBS_LOADED" == "true" ]] && type ma_get_standard_endpoints &>/dev/null; then
+            CFG_UDP_ENDPOINTS=${UDP_ENDPOINTS:-$(ma_get_standard_endpoints)}
+            CFG_UDP_ENDPOINTS=$(ma_normalize_endpoints "$CFG_UDP_ENDPOINTS")
+        else
+            CFG_UDP_ENDPOINTS=${UDP_ENDPOINTS:-127.0.0.1:14540,127.0.0.1:14569,127.0.0.1:12550}
+        fi
     else
         # Use detected device as default
         CFG_UART_DEVICE=$(detect_uart_device)
         CFG_UART_BAUD="57600"
-        CFG_UDP_ENDPOINTS="0.0.0.0:14550"
+        if [[ "$LIBS_LOADED" == "true" ]] && type ma_get_standard_endpoints &>/dev/null; then
+            CFG_UDP_ENDPOINTS=$(ma_get_standard_endpoints)
+        else
+            CFG_UDP_ENDPOINTS="127.0.0.1:14540,127.0.0.1:14569,127.0.0.1:12550"
+        fi
     fi
 
     # Override with CLI-specified device if provided
@@ -803,8 +847,11 @@ else
     read -p "Baud rate [${CFG_UART_BAUD}]: " UART_BAUD
     UART_BAUD=${UART_BAUD:-$CFG_UART_BAUD}
 
-    read -p "UDP endpoints (space-separated) [${CFG_UDP_ENDPOINTS}]: " UDP_ENDPOINTS
+    read -p "UDP endpoints (comma-separated) [${CFG_UDP_ENDPOINTS}]: " UDP_ENDPOINTS
     UDP_ENDPOINTS=${UDP_ENDPOINTS:-$CFG_UDP_ENDPOINTS}
+    if [[ "$LIBS_LOADED" == "true" ]] && type ma_normalize_endpoints &>/dev/null; then
+        UDP_ENDPOINTS=$(ma_normalize_endpoints "$UDP_ENDPOINTS")
+    fi
 
     echo ""
     print_progress "Creating configuration..."
@@ -838,9 +885,10 @@ Port=14550
 EOF
 
     # Add UDP endpoints
-    IFS=' ' read -r -a ENDPOINT_ARRAY <<< "${UDP_ENDPOINTS}"
+    IFS=',' read -r -a ENDPOINT_ARRAY <<< "${UDP_ENDPOINTS}"
     INDEX=1
     for ENDPOINT in "${ENDPOINT_ARRAY[@]}"; do
+        ENDPOINT=$(echo "${ENDPOINT}" | tr -d ' ')
         sudo bash -c "cat >> /etc/mavlink-router/main.conf" <<EOF
 
 [UdpEndpoint udp${INDEX}]
@@ -929,6 +977,6 @@ fi
 
 if [[ "$SKIP_DASHBOARD" != "true" ]] && [[ "$INSTALL_DASHBOARD_ONLY" != "true" ]]; then
     if [[ "$LIBS_LOADED" == "true" ]] && type install_dashboard &>/dev/null; then
-        install_dashboard || true  # Non-fatal: dashboard is optional
+        install_dashboard "${DASHBOARD_LISTEN:-127.0.0.1:9070}" || true  # Non-fatal: dashboard is optional
     fi
 fi

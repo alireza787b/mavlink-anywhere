@@ -78,6 +78,7 @@ This command is an alias for `./configure_mavlink_router.sh`.
 | `--input-port PORT` | UDP listen port | 14550 |
 | `--skip-dashboard` | Skip web dashboard installation | - |
 | `--install-dashboard` | Install/update dashboard only | - |
+| `--dashboard-listen HOST:PORT` | Dashboard listen address | 127.0.0.1:9070 |
 | `--skip-serial-check` | Skip serial port prerequisite check | - |
 | `--debug` | Enable debug output | - |
 
@@ -101,6 +102,10 @@ sudo mavlink-anywhere configure --headless \
     --input-type udp \
     --input-port 14550 \
     --endpoints "127.0.0.1:14540"
+
+# Expose the dashboard on the network
+sudo mavlink-anywhere configure --install-dashboard \
+    --dashboard-listen 0.0.0.0:9070
 ```
 
 ---
@@ -290,7 +295,7 @@ Endpoints are specified as `IP:PORT` pairs, comma-separated:
 "127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550"
 ```
 
-### Standard MDS Endpoints
+### Standard Default Endpoints
 
 | Port | Service | Mode | Description |
 |------|---------|------|-------------|

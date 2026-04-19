@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Dashboard Management
 # =============================================================================
-# Version: 3.0.0
+# Version: 3.0.1
 # Description: Install, configure, and manage the web dashboard binary
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -159,6 +159,11 @@ setup_dashboard_service() {
     return 0
 }
 
+dashboard_is_local_only() {
+    local listen_addr="${1:-127.0.0.1:${DASHBOARD_PORT}}"
+    [[ "$listen_addr" =~ ^(127\.0\.0\.1|localhost|\[::1\]): ]]
+}
+
 # Remove the dashboard service (leaves binary in place)
 remove_dashboard_service() {
     ma_log_step "Removing dashboard service..."
@@ -206,7 +211,13 @@ install_dashboard() {
     setup_dashboard_service "$listen_addr"
 
     echo ""
-    ma_log_success "Dashboard available at: http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'localhost'):${DASHBOARD_PORT}"
+    if dashboard_is_local_only "$listen_addr"; then
+        ma_log_success "Dashboard available locally at: http://${listen_addr}"
+        ma_log_info "Use an SSH tunnel or re-run with --dashboard-listen 0.0.0.0:${DASHBOARD_PORT} to expose it on the network."
+    else
+        ma_log_success "Dashboard listening on: http://${listen_addr}"
+        ma_log_info "If a firewall is enabled, allow TCP ${DASHBOARD_PORT} or use a VPN/SSH tunnel."
+    fi
     return 0
 }
 

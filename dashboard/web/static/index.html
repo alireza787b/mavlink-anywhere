@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mavlink-anywhere Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <script defer src="alpine.min.js"></script>
     <script defer src="app.js"></script>
+    <script defer src="alpine.min.js"></script>
 </head>
-<body x-data="dashboard()" x-init="init()">
+<body x-data="dashboard">
 
     <!-- Header -->
     <header class="header">
         <div class="header-left">
             <h1 class="logo">mavlink-anywhere</h1>
-            <span class="version" x-text="'v' + status.version" x-show="status.version"></span>
+            <span class="version" x-text="status.version" x-show="status.version"></span>
         </div>
         <div class="header-right">
             <span class="status-badge" :class="serviceStateClass" x-text="serviceStateLabel"></span>
@@ -98,8 +98,8 @@
                     <div class="endpoint-card" :class="{'endpoint-disabled': !ep.enabled}">
                         <div class="endpoint-header">
                             <span class="endpoint-name" x-text="ep.name"></span>
-                            <span class="mode-badge" :class="ep.mode === 'server' ? 'mode-server' : 'mode-normal'"
-                                  x-text="ep.mode?.toUpperCase() || ep.type"></span>
+                            <span class="mode-badge" :class="endpointModeClass(ep)"
+                                  x-text="endpointModeLabel(ep)"></span>
                             <span class="status-dot" :class="ep.enabled ? 'dot-green' : 'dot-gray'"></span>
                             <span class="endpoint-status" x-text="ep.enabled ? 'enabled' : 'disabled'"></span>
                         </div>

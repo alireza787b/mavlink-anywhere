@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Configuration Generation
 # =============================================================================
-# Version: 2.0.0
+# Version: 3.0.1
 # Description: Generate mavlink-router configuration files
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -86,14 +86,30 @@ EOF
 # Any GCS can connect TO this device — no IP pre-configuration needed.
 generate_gcs_listen_endpoint() {
     cat <<EOF
-# Default server-mode endpoint — any GCS can connect to this device on port ${MDS_ENDPOINT_GCS_LISTEN_PORT}
-# QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port ${MDS_ENDPOINT_GCS_LISTEN_PORT}
+# Default server-mode endpoint — any GCS can connect to this device on port ${DEFAULT_GCS_LISTEN_PORT}
+# QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port ${DEFAULT_GCS_LISTEN_PORT}
 [UdpEndpoint gcs_listen]
 Mode=server
-Address=${MDS_ENDPOINT_GCS_LISTEN_ADDR}
-Port=${MDS_ENDPOINT_GCS_LISTEN_PORT}
+Address=${DEFAULT_GCS_LISTEN_ADDR}
+Port=${DEFAULT_GCS_LISTEN_PORT}
 
 EOF
+}
+
+build_endpoint_name() {
+    local address="$1"
+    local port="$2"
+    local index="$3"
+
+    case "${address}:${port}" in
+        127.0.0.1:14540|localhost:14540) echo "mavsdk" ;;
+        127.0.0.1:14569|localhost:14569) echo "mavlink2rest" ;;
+        127.0.0.1:12550|localhost:12550) echo "local_mavlink" ;;
+        *:14550) echo "gcs_${index}" ;;
+        *:24550) echo "remote_gcs_${index}" ;;
+        *:34550) echo "aggregation_${index}" ;;
+        *) echo "udp${index}" ;;
+    esac
 }
 
 # Parse endpoint string and generate appropriate config section
@@ -122,17 +138,8 @@ parse_and_generate_endpoint() {
     if [[ "$endpoint" =~ ^([^:]+):([0-9]+)$ ]]; then
         local address="${BASH_REMATCH[1]}"
         local port="${BASH_REMATCH[2]}"
-        local name="udp${index}"
-
-        # Use descriptive names for well-known ports
-        case "$port" in
-            14540) name="mavsdk" ;;
-            14550) name="gcs" ;;
-            14569) name="mavlink2rest" ;;
-            12550) name="local_mavlink" ;;
-            24550) name="gcs_vpn" ;;
-            34550) name="aggregation" ;;
-        esac
+        local name
+        name=$(build_endpoint_name "$address" "$port" "$index")
 
         generate_udp_endpoint "$address" "$port" "$name"
     else
@@ -144,7 +151,8 @@ parse_and_generate_endpoint() {
 generate_uart_config() {
     local uart_device="$1"
     local uart_baud="$2"
-    local endpoints="$3"  # Comma-separated list
+    local endpoints
+    endpoints=$(ma_normalize_endpoints "$3")
 
     # Use a subshell with direct output to preserve newlines
     {
@@ -153,10 +161,9 @@ generate_uart_config() {
         generate_gcs_listen_endpoint
         # Parse and add UDP endpoints
         local endpoint_array
-        IFS=',' read -ra endpoint_array <<< "$endpoints"
+        ma_parse_endpoints "$endpoints" endpoint_array
         local index=1
         for endpoint in "${endpoint_array[@]}"; do
-            endpoint=$(echo "$endpoint" | tr -d ' ')
             if [[ -n "$endpoint" ]]; then
                 parse_and_generate_endpoint "$endpoint" "$index"
                 ((index++))
@@ -169,23 +176,23 @@ generate_uart_config() {
 generate_udp_input_config() {
     local input_address="$1"
     local input_port="$2"
-    local endpoints="$3"  # Comma-separated list
+    local endpoints
+    endpoints=$(ma_normalize_endpoints "$3")
 
     {
         generate_config_header
         generate_udp_server_endpoint "$input_address" "$input_port" "input"
 
         # Default GCS listen endpoint (only if input port differs from GCS listen port)
-        if [[ "$input_port" != "${MDS_ENDPOINT_GCS_LISTEN_PORT}" ]]; then
+        if [[ "$input_port" != "${DEFAULT_GCS_LISTEN_PORT}" ]]; then
             generate_gcs_listen_endpoint
         fi
 
         # Parse and add output UDP endpoints
         local endpoint_array
-        IFS=',' read -ra endpoint_array <<< "$endpoints"
+        ma_parse_endpoints "$endpoints" endpoint_array
         local index=1
         for endpoint in "${endpoint_array[@]}"; do
-            endpoint=$(echo "$endpoint" | tr -d ' ')
             if [[ -n "$endpoint" ]]; then
                 parse_and_generate_endpoint "$endpoint" "$index"
                 ((index++))
@@ -233,6 +240,7 @@ write_env_file() {
     local input_port="${6:-}"
 
     local env_file="${MAVLINK_ROUTER_ENV_FILE}"
+    udp_endpoints=$(ma_normalize_endpoints "$udp_endpoints")
 
     # Ensure directory exists
     ma_ensure_dir "$(dirname "$env_file")"
@@ -391,7 +399,8 @@ display_current_config() {
 configure_uart_headless() {
     local uart_device="$1"
     local uart_baud="$2"
-    local endpoints="$3"
+    local endpoints
+    endpoints=$(ma_normalize_endpoints "$3")
 
     ma_log_step "Generating UART configuration..."
 
@@ -419,7 +428,8 @@ configure_uart_headless() {
 configure_udp_headless() {
     local input_address="$1"
     local input_port="$2"
-    local endpoints="$3"
+    local endpoints
+    endpoints=$(ma_normalize_endpoints "$3")
 
     ma_log_step "Generating UDP input configuration..."
 
