@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Dashboard Management
 # =============================================================================
-# Version: 3.0.1
+# Version: 3.0.2
 # Description: Install, configure, and manage the web dashboard binary
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere

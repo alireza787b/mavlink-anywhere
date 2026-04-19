@@ -81,10 +81,10 @@
             </div>
         </div>
 
-        <!-- Endpoints -->
+        <!-- Routing -->
         <div class="card">
             <div class="card-header-row">
-                <h2 class="card-title">Endpoints</h2>
+                <h2 class="card-title">Routing</h2>
                 <div class="card-actions">
                     <button class="btn btn-sm btn-outline" @click="showAddWizard = true">+ Add Endpoint</button>
                     <button class="btn btn-sm btn-outline" @click="showRawConfig = !showRawConfig"
@@ -94,36 +94,72 @@
 
             <!-- Card view -->
             <div x-show="!showRawConfig">
-                <template x-for="ep in endpointList" :key="ep.name">
-                    <div class="endpoint-card" :class="{'endpoint-disabled': !ep.enabled}">
-                        <div class="endpoint-header">
-                            <span class="endpoint-name" x-text="ep.name"></span>
-                            <span class="mode-badge" :class="endpointModeClass(ep)"
-                                  x-text="endpointModeLabel(ep)"></span>
-                            <span class="status-dot" :class="ep.enabled ? 'dot-green' : 'dot-gray'"></span>
-                            <span class="endpoint-status" x-text="ep.enabled ? 'enabled' : 'disabled'"></span>
-                        </div>
-                        <div class="endpoint-body">
-                            <div class="endpoint-addr" x-show="ep.address">
-                                <span x-text="ep.address + ':' + ep.port"></span>
-                            </div>
-                            <div class="endpoint-addr" x-show="ep.device">
-                                <span x-text="ep.device + ' @ ' + ep.baud"></span>
-                            </div>
-                            <div class="endpoint-desc" x-text="ep.description"></div>
-                        </div>
-                        <div class="endpoint-actions" x-show="ep.type !== 'UartEndpoint'">
-                            <button class="btn btn-xs btn-outline" @click="editEndpoint(ep)">edit</button>
-                            <button class="btn btn-xs btn-outline"
-                                    @click="toggleEp(ep)"
-                                    x-text="ep.enabled ? 'disable' : 'enable'"></button>
-                            <button class="btn btn-xs btn-danger-outline" x-show="ep.removable"
-                                    @click="deleteEp(ep)">delete</button>
-                        </div>
+                <div class="routing-section" x-show="listenerEndpoints.length > 0">
+                    <div class="routing-section-header">
+                        <h3 class="routing-section-title">Listeners</h3>
+                        <span class="routing-section-count" x-text="listenerEndpoints.length"></span>
                     </div>
-                </template>
-                <div class="empty-state" x-show="endpointList.length === 0">
-                    No endpoints configured.
+                    <template x-for="ep in listenerEndpoints" :key="ep.name">
+                        <div class="endpoint-card" :class="{'endpoint-disabled': !ep.enabled}">
+                            <div class="endpoint-header">
+                                <span class="endpoint-name" x-text="ep.name"></span>
+                                <span class="mode-badge" :class="endpointModeClass(ep)"
+                                      x-text="endpointModeLabel(ep)"></span>
+                                <span class="status-dot" :class="ep.enabled ? 'dot-green' : 'dot-gray'"></span>
+                                <span class="endpoint-status" x-text="ep.enabled ? 'enabled' : 'disabled'"></span>
+                            </div>
+                            <div class="endpoint-body">
+                                <div class="endpoint-addr" x-show="ep.address">
+                                    <span x-text="ep.address + ':' + ep.port"></span>
+                                </div>
+                                <div class="endpoint-desc" x-text="ep.description"></div>
+                            </div>
+                            <div class="endpoint-actions" x-show="ep.type !== 'UartEndpoint'">
+                                <button class="btn btn-xs btn-outline" @click="editEndpoint(ep)">edit</button>
+                                <button class="btn btn-xs btn-outline"
+                                        @click="toggleEp(ep)"
+                                        x-text="ep.enabled ? 'disable' : 'enable'"></button>
+                                <button class="btn btn-xs btn-danger-outline" x-show="ep.removable"
+                                        @click="deleteEp(ep)">delete</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="routing-section" x-show="outputEndpoints.length > 0">
+                    <div class="routing-section-header">
+                        <h3 class="routing-section-title">Outputs</h3>
+                        <span class="routing-section-count" x-text="outputEndpoints.length"></span>
+                    </div>
+                    <template x-for="ep in outputEndpoints" :key="ep.name">
+                        <div class="endpoint-card" :class="{'endpoint-disabled': !ep.enabled}">
+                            <div class="endpoint-header">
+                                <span class="endpoint-name" x-text="ep.name"></span>
+                                <span class="mode-badge" :class="endpointModeClass(ep)"
+                                      x-text="endpointModeLabel(ep)"></span>
+                                <span class="status-dot" :class="ep.enabled ? 'dot-green' : 'dot-gray'"></span>
+                                <span class="endpoint-status" x-text="ep.enabled ? 'enabled' : 'disabled'"></span>
+                            </div>
+                            <div class="endpoint-body">
+                                <div class="endpoint-addr" x-show="ep.address">
+                                    <span x-text="ep.address + ':' + ep.port"></span>
+                                </div>
+                                <div class="endpoint-desc" x-text="ep.description"></div>
+                            </div>
+                            <div class="endpoint-actions" x-show="ep.type !== 'UartEndpoint'">
+                                <button class="btn btn-xs btn-outline" @click="editEndpoint(ep)">edit</button>
+                                <button class="btn btn-xs btn-outline"
+                                        @click="toggleEp(ep)"
+                                        x-text="ep.enabled ? 'disable' : 'enable'"></button>
+                                <button class="btn btn-xs btn-danger-outline" x-show="ep.removable"
+                                        @click="deleteEp(ep)">delete</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="empty-state" x-show="listenerEndpoints.length === 0 && outputEndpoints.length === 0">
+                    No routing endpoints configured.
                 </div>
             </div>
 

@@ -285,7 +285,7 @@ ss -ulpn | grep mavlink
 
 ### Can't Connect from QGroundControl
 
-**Quick fix (v3.0.0+):** Your device should have a default server endpoint on port 14550. In QGC, add a UDP connection pointing to `<device-ip>:14550`.
+**Quick fix (v3.0.0+):** Your device should have a default server endpoint on port 14550. In QGC, add a UDP connection pointing to `<device-ip>:14550`. This works because QGC sends first, allowing the router to learn the active remote IP:port.
 
 **Checklist:**
 

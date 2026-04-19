@@ -65,7 +65,9 @@ To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
 
 The configure script handles everything - platform detection, serial setup, configuration, and dashboard.
 
-**New in v3.0.0:** Any GCS can now connect to your device on port 14550 out of the box - no IP configuration needed.
+**Default GCS listener:** `mavlink-anywhere` creates a server-mode listener on `14550/udp`, so QGroundControl can point to `<device-ip>:14550` without pre-configuring a remote IP on the device.
+
+**Important:** This follows `mavlink-router` UDP server semantics: the active remote is the **last sender** on that listener. If you need simultaneous remote consumers, add explicit `Mode=Normal` endpoints for each destination or use the built-in TCP server.
 
 ---
 
@@ -161,6 +163,27 @@ sudo systemctl restart mavlink-router
 ./mavlink-router-cli.sh logs        # View live logs
 ./mavlink-router-cli.sh endpoints   # Quick endpoint edit
 ./mavlink-router-cli.sh help        # All commands
+```
+
+### Update to Latest Version
+
+```bash
+cd ~/mavlink-anywhere
+git fetch --tags origin
+git pull --ff-only
+
+# Update mavlink-anywhere dashboard/service files
+sudo ./configure_mavlink_router.sh --install-dashboard
+
+# Optional: rebuild upstream mavlink-routerd as well
+sudo ./install_mavlink_router.sh
+```
+
+If your dashboard is intentionally exposed on the network, re-run the dashboard step with:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+    --dashboard-listen 0.0.0.0:9070
 ```
 
 ---

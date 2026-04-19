@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Common Utilities
 # =============================================================================
-# Version: 3.0.1
+# Version: 3.0.2
 # Description: Core utilities - colors, logging, shared functions
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -16,7 +16,7 @@ _MAVLINK_COMMON_LOADED=1
 # CONSTANTS
 # =============================================================================
 
-readonly MAVLINK_ANYWHERE_VERSION="3.0.1"
+readonly MAVLINK_ANYWHERE_VERSION="3.0.2"
 readonly MAVLINK_ROUTER_CONFIG_DIR="/etc/mavlink-router"
 readonly MAVLINK_ROUTER_CONFIG_FILE="${MAVLINK_ROUTER_CONFIG_DIR}/main.conf"
 readonly MAVLINK_ROUTER_ENV_FILE="/etc/default/mavlink-router"

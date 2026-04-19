@@ -20,7 +20,8 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
 ## Features
 
 - **Service Status** — See if mavlink-router is running, uptime, and version at a glance
-- **Endpoint Management** — View, add, edit, delete, and toggle MAVLink endpoints
+- **Routing View** — Input source is separated from listener and output routes
+- **Endpoint Management** — View, add, edit, delete, and toggle MAVLink routes
 - **Guided Add Wizard** — Step-by-step wizard for adding new endpoints (GCS, local services, VPN)
 - **Live Logs** — Real-time streaming of mavlink-router logs via SSE
 - **Service Control** — Start, stop, restart mavlink-router from the browser
@@ -134,7 +135,39 @@ As of v3.0.0, mavlink-anywhere includes a default **server-mode** endpoint on po
 - No pre-configuration of GCS IP is needed on the device
 - Works out of the box for ad-hoc connections
 
+This uses `mavlink-router` UDP **server mode**, so the router sends replies to the IP:port of the **last client that sent traffic** on that endpoint. Treat it as a convenient device-side listener, not as a multi-client fanout bus.
+
+If you need multiple simultaneous remote consumers:
+
+- Add dedicated `Mode=Normal` endpoints for each remote IP:port
+- Or use the default TCP server on port `5760`
+
 **QGroundControl**: Comm Links → Add → UDP → Server: `<device-ip>` → Port: `14550`
+
+## Update Workflow
+
+Update the installed tool and dashboard:
+
+```bash
+cd ~/mavlink-anywhere
+git fetch --tags origin
+git pull --ff-only
+sudo ./configure_mavlink_router.sh --install-dashboard
+```
+
+If you also want to refresh the installed `mavlink-routerd` binary from source:
+
+```bash
+cd ~/mavlink-anywhere
+sudo ./install_mavlink_router.sh
+```
+
+If the dashboard is exposed on the network, keep the explicit bind:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070
+```
 
 ## API Reference
 

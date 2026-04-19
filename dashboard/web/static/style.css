@@ -233,6 +233,45 @@ body {
 
 .detail-line strong { color: var(--text); }
 
+.routing-section {
+    margin-bottom: 16px;
+}
+
+.routing-section:last-child {
+    margin-bottom: 0;
+}
+
+.routing-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.routing-section-title {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.routing-section-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
 /* Endpoint cards */
 .endpoint-card {
     border: 1px solid var(--border);

@@ -64,6 +64,14 @@ function dashboard() {
             return this.templates.find(t => t.id === this.wizardType) || null;
         },
 
+        get listenerEndpoints() {
+            return this.endpointList.filter((ep) => ep.category !== 'input' && ep.mode === 'server');
+        },
+
+        get outputEndpoints() {
+            return this.endpointList.filter((ep) => ep.category !== 'input' && ep.mode !== 'server');
+        },
+
         get wizardPreview() {
             const name = this.wizardName || this.wizardType || 'endpoint';
             const addr = this.wizardAddr || this.selectedTemplate?.defaultAddress || '0.0.0.0';

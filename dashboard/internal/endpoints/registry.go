@@ -19,8 +19,8 @@ var Registry = []EndpointTemplate{
 		Mode:        "server",
 		DefaultAddr: "0.0.0.0",
 		DefaultPort: 14550,
-		Description: "Any GCS can connect to this device on this port",
-		InfoText:    "GCS connects TO this device — no IP pre-configuration needed. Works like ARK OS.",
+		Description: "Inbound GCS listener on this device (last sender becomes the active remote)",
+		InfoText:    "GCS connects TO this device — no IP pre-configuration needed. Server-mode UDP learns the active remote from the last sender.",
 	},
 	{
 		ID:          "mavsdk",
@@ -98,7 +98,7 @@ func DescriptionForEndpoint(name, mode, address string, port int) string {
 	}
 
 	if mode == "server" {
-		return "Listening for incoming GCS connections"
+		return "Inbound listener on this device (server mode)"
 	}
 
 	if port == 24550 {
