@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Dashboard Management
 # =============================================================================
-# Version: 3.0.2
+# Version: 3.0.3
 # Description: Install, configure, and manage the web dashboard binary
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -50,6 +50,12 @@ get_dashboard_version() {
     if [[ -x "$binary" ]]; then
         "$binary" --version 2>/dev/null | head -1
     fi
+}
+
+dashboard_binary_is_current() {
+    local installed_version
+    installed_version=$(get_dashboard_version)
+    [[ -n "$installed_version" && "$installed_version" == *" v${MAVLINK_ANYWHERE_VERSION} "* ]]
 }
 
 # Download and install the dashboard binary from GitHub Releases.
@@ -202,6 +208,11 @@ install_dashboard() {
             ma_log_warn "Dashboard binary download failed — skipping dashboard setup"
             ma_log_info "You can install it later: sudo ${DASHBOARD_INSTALL_DIR}/configure_mavlink_router.sh --install-dashboard"
             return 1
+        fi
+    elif ! dashboard_binary_is_current; then
+        ma_log_info "Updating dashboard binary: $(get_dashboard_version) -> v${MAVLINK_ANYWHERE_VERSION}"
+        if ! install_dashboard_binary "v${MAVLINK_ANYWHERE_VERSION}"; then
+            ma_log_warn "Dashboard binary update failed — keeping existing version"
         fi
     else
         ma_log_info "Dashboard binary already installed: $(get_dashboard_version)"

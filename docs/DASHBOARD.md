@@ -155,6 +155,8 @@ git pull --ff-only
 sudo ./configure_mavlink_router.sh --install-dashboard
 ```
 
+`--install-dashboard` updates the dashboard binary when the installed version is older than the checked-out `mavlink-anywhere` release.
+
 If you also want to refresh the installed `mavlink-routerd` binary from source:
 
 ```bash

@@ -186,6 +186,8 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
     --dashboard-listen 0.0.0.0:9070
 ```
 
+`--install-dashboard` refreshes the installed dashboard binary when the host is running an older `mavlink-anywhere` release.
+
 ---
 
 ## 🔌 Supported Platforms
