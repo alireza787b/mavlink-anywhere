@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Dashboard Management
 # =============================================================================
-# Version: 3.0.3
+# Version: 3.0.4
 # Description: Install, configure, and manage the web dashboard binary
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -153,8 +153,8 @@ setup_dashboard_service() {
     systemctl daemon-reload
     systemctl enable "$DASHBOARD_SERVICE" 2>/dev/null
 
-    # Start if mavlink-router is also running
-    systemctl start "$DASHBOARD_SERVICE" 2>/dev/null
+    # Always restart so service file changes and binary updates take effect
+    systemctl restart "$DASHBOARD_SERVICE" 2>/dev/null
 
     if systemctl is-active --quiet "$DASHBOARD_SERVICE" 2>/dev/null; then
         ma_log_success "Dashboard service started on ${listen_addr}"
