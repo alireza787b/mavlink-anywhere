@@ -78,6 +78,10 @@ func (s *Server) addEndpoint(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
+	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
+		return
+	}
 
 	writeJSON(w, http.StatusCreated, map[string]string{"status": "endpoint added", "name": ep.Name})
 }
@@ -119,6 +123,10 @@ func (s *Server) updateEndpoint(w http.ResponseWriter, r *http.Request, name str
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
+		return
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "endpoint updated"})
 }
@@ -126,6 +134,10 @@ func (s *Server) updateEndpoint(w http.ResponseWriter, r *http.Request, name str
 func (s *Server) deleteEndpoint(w http.ResponseWriter, r *http.Request, name string) {
 	if err := config.DeleteEndpoint(s.configPath, name); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "endpoint deleted"})
@@ -148,6 +160,10 @@ func (s *Server) toggleEndpoint(w http.ResponseWriter, r *http.Request, name str
 
 	if err := config.ToggleEndpoint(s.configPath, name, payload.Enabled); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
 		return
 	}
 

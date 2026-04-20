@@ -112,7 +112,7 @@ func (s *Server) putInput(w http.ResponseWriter, r *http.Request) {
 		if payload.Port == 0 {
 			payload.Port = 14550
 		}
-		newEps = append([]endpoints.Endpoint{{
+		candidate := endpoints.Endpoint{
 			Name:     "input",
 			Type:     "UdpEndpoint",
 			Mode:     "server",
@@ -120,14 +120,19 @@ func (s *Server) putInput(w http.ResponseWriter, r *http.Request) {
 			Port:     payload.Port,
 			Category: "input",
 			Enabled:  true,
-		}}, newEps...)
+		}
+		if err := config.ValidateEndpointTopology(newEps, candidate, ""); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		newEps = append([]endpoints.Endpoint{candidate}, newEps...)
 	default:
 		writeError(w, http.StatusBadRequest, "type must be 'uart' or 'udp'")
 		return
 	}
 
 	pc.Endpoints = newEps
-	if err := config.WriteConfigFile(s.configPath, pc); err != nil {
+	if err := config.WriteConfigAndEnv(s.configPath, s.envPath, pc); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to write config: "+err.Error())
 		return
 	}

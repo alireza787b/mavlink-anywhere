@@ -28,6 +28,7 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
 - **Live Logs** — Real-time streaming of mavlink-router logs via SSE
 - **Service Control** — Start, stop, restart mavlink-router from the browser
 - **System Info** — Board detection, UART status, firewall info, RAM usage
+- **Routing Profiles** — Export the current effective routing profile, preview an import, apply with backup, and restore the last good backup
 - **Raw Config Editor** — Advanced users can edit the INI config directly
 - **Default Server Endpoint** — Port 14550 listens for any GCS connection out of the box
 - **Source Visibility** — The active MAVLink source is shown separately from output endpoints
@@ -219,6 +220,11 @@ GET    /api/v1/status              # Service status, version, board info
 GET    /api/v1/diagnostics         # MAVLink probe, warnings, docs links
 GET    /api/v1/config              # Current config as JSON
 PUT    /api/v1/config              # Write raw config
+GET    /api/v1/profiles/export     # Export current effective routing profile
+POST   /api/v1/profiles/preview    # Validate and preview imported profile
+POST   /api/v1/profiles/apply      # Apply imported profile with backup
+GET    /api/v1/profiles/backups    # List routing backups
+POST   /api/v1/profiles/restore    # Restore the latest backup
 GET    /api/v1/endpoints           # List all endpoints
 POST   /api/v1/endpoints           # Add endpoint
 PUT    /api/v1/endpoints/{name}    # Update endpoint
@@ -248,9 +254,47 @@ GET    /api/v1/health              # Health check
 
 If your Linux architecture is outside this list, use CLI-only mode or the manual source build above.
 
+## Routing Profiles
+
+Routing profiles are a dashboard-first feature for repeatable endpoint layouts.
+
+What gets exported:
+
+- router general settings
+- all configured endpoints, including the input endpoint
+- lightweight metadata such as profile name and export timestamp
+
+What does **not** get exported:
+
+- logs
+- runtime process state
+- firewall rules
+- host bootloader serial settings
+
+Import workflow:
+
+1. choose a `.json` profile file
+2. preview the changes
+3. choose `Replace current routing` or `Merge named endpoints`
+4. apply
+5. dashboard creates a backup and restarts `mavlink-router`
+
+Current rules:
+
+- importing a profile does **not** require reboot
+- reboot is only required when you separately change host serial boot settings
+- replace mode removes endpoints that are not present in the imported profile
+- merge mode keeps existing endpoints unless an imported endpoint with the same name replaces them
+- the dashboard regenerates `/etc/default/mavlink-router` from the effective config so CLI, docs, and UI stay aligned
+
+Restore workflow:
+
+- `Restore Last Good` restores the latest dashboard-created backup
+- it writes both the config file and the companion env file
+- it restarts `mavlink-router` after restore
+
 ## Not Yet Implemented
 
-- Profile import/export/diff/replace for full endpoint sets
 - Token-based auth for non-local dashboard exposure
 - Deep FC sensor/firmware discovery beyond passive routed-stream detection
 

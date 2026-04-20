@@ -61,6 +61,8 @@ http://127.0.0.1:9070
 Manage endpoints, inspect MAVLink health, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
 To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
 
+The dashboard can also export the current effective routing profile, preview imported profiles, apply them with automatic backup, and restore the last good dashboard-managed backup.
+
 ## ✅ That's It!
 
 The configure script handles everything - platform detection, serial setup, configuration, and dashboard.
@@ -199,6 +201,17 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
 | **UDP Input** | None needed | For SITL/simulation |
 
 Dashboard release binaries are published for `arm6`, `arm64`, and `amd64`. On other Linux architectures, the configure script will try a local Go build if `go` is installed; otherwise the router still works without the dashboard.
+
+## Routing Profiles
+
+Use dashboard profiles when you want repeatable routing layouts without editing raw INI by hand.
+
+- **Export** writes the current effective routing config to JSON
+- **Import** previews changes before apply
+- **Apply** creates a backup and restarts `mavlink-router`
+- **Restore Last Good** reverts to the latest dashboard-created backup
+
+Profiles are intentionally limited to router configuration. They do not change firewall policy or host boot serial settings.
 
 ---
 

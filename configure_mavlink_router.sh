@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.5
+# Version: 3.0.6
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -119,7 +119,7 @@ DASHBOARD_LISTEN=""
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.5
+MAVLink-Anywhere Configuration Script v3.0.6
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 

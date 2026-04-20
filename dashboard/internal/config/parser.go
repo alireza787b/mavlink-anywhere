@@ -27,35 +27,29 @@ type GeneralSection struct {
 
 // ParseConfigFile reads and parses an INI-style mavlink-router config file.
 func ParseConfigFile(path string) (*ParsedConfig, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open config: %w", err)
-	}
-	defer f.Close()
-
-	info, err := f.Stat()
+	info, err := os.Stat(path)
 	if err != nil {
 		return nil, fmt.Errorf("stat config: %w", err)
 	}
-
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
 
+	return ParseConfigText(string(raw), info.ModTime())
+}
+
+// ParseConfigText parses an INI-style mavlink-router config string.
+func ParseConfigText(raw string, modifiedAt time.Time) (*ParsedConfig, error) {
 	pc := &ParsedConfig{
 		General: GeneralSection{
 			TcpServerPort: 5760,
 		},
-		Raw:        string(raw),
-		ModifiedAt: info.ModTime(),
+		Raw:        raw,
+		ModifiedAt: modifiedAt,
 	}
 
-	scanner := bufio.NewScanner(f)
-	// Re-open since we read the file above
-	f2, _ := os.Open(path)
-	defer f2.Close()
-	scanner = bufio.NewScanner(f2)
+	scanner := bufio.NewScanner(strings.NewReader(raw))
 
 	var currentSection string
 	var currentName string
@@ -217,6 +211,23 @@ func WriteConfigFile(path string, pc *ParsedConfig) error {
 	}
 
 	return os.WriteFile(path, []byte(b.String()), 0644)
+}
+
+// WriteConfigAndEnv writes the config file and regenerates the companion env file.
+func WriteConfigAndEnv(configPath, envPath string, pc *ParsedConfig) error {
+	if err := WriteConfigFile(configPath, pc); err != nil {
+		return err
+	}
+	return WriteEnvFile(envPath, EnvFromConfig(pc))
+}
+
+// WriteRawConfig validates and writes raw config text, then regenerates the env file.
+func WriteRawConfig(configPath, envPath, raw string) error {
+	pc, err := ParseConfigText(raw, time.Now())
+	if err != nil {
+		return err
+	}
+	return WriteConfigAndEnv(configPath, envPath, pc)
 }
 
 // ConfigModTime returns the modification time of the config file.

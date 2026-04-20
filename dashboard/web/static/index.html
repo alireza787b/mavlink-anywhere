@@ -9,6 +9,8 @@
     <script defer src="alpine.min.js"></script>
 </head>
 <body x-data="dashboard">
+    <input type="file" accept="application/json,.json" x-ref="profileFile" class="visually-hidden"
+           @change="onProfileFileSelected($event)">
 
     <!-- Header -->
     <header class="header">
@@ -157,6 +159,39 @@
                         <a class="doc-link" x-show="alert.docUrl" :href="alert.docUrl" target="_blank" rel="noreferrer">Open docs</a>
                     </div>
                 </template>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header-row">
+                <h2 class="card-title">Profiles</h2>
+                <div class="card-actions">
+                    <button class="btn btn-sm btn-outline" @click="exportProfile()">Export</button>
+                    <button class="btn btn-sm btn-outline" @click="openProfilePicker()">Import</button>
+                    <button class="btn btn-sm btn-outline"
+                            @click="restoreLatestBackup()"
+                            :disabled="!latestProfileBackup || loading.profileRestore">
+                        Restore Last Good
+                    </button>
+                </div>
+            </div>
+            <div class="profile-summary-grid">
+                <div class="system-item">
+                    <span class="system-label">Workflow</span>
+                    <span>Export current routing, preview changes, apply with backup.</span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">Restart</span>
+                    <span>Applying a profile restarts mavlink-router. Reboot is not required.</span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">Latest Backup</span>
+                    <span x-text="latestProfileBackup ? formatTimestamp(latestProfileBackup.createdAt) : 'None yet'"></span>
+                </div>
+                <div class="system-item">
+                    <span class="system-label">Import Modes</span>
+                    <span>Replace current routing or merge named endpoints into the current config.</span>
+                </div>
             </div>
         </div>
 
@@ -342,6 +377,83 @@
                 <div class="modal-actions">
                     <button class="btn btn-outline" @click="showEditModal = false">Cancel</button>
                     <button class="btn btn-primary" @click="saveEdit()" :disabled="loading.edit">Save & Restart</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Profile Preview Modal -->
+        <div class="modal-overlay" x-show="showProfilePreview" @click.self="closeProfilePreview()" x-cloak>
+            <div class="modal modal-wide">
+                <h2 class="modal-title">Import Routing Profile</h2>
+                <div class="detail-line" x-show="profileFileName">
+                    <strong x-text="profileFileName"></strong>
+                </div>
+                <div class="form-group">
+                    <label>Apply Mode</label>
+                    <select x-model="profileImportMode" class="input" @change="refreshProfilePreview()">
+                        <option value="replace">Replace current routing</option>
+                        <option value="merge_endpoints">Merge named endpoints</option>
+                    </select>
+                </div>
+
+                <div class="empty-state" x-show="loading.profilePreview">
+                    Building preview...
+                </div>
+
+                <div x-show="profilePreview">
+                    <div class="profile-preview-grid">
+                        <div class="system-item">
+                            <span class="system-label">Restart</span>
+                            <span x-text="profilePreview?.restartRequired ? 'Required' : 'Not required'"></span>
+                        </div>
+                        <div class="system-item">
+                            <span class="system-label">Reboot</span>
+                            <span x-text="profilePreview?.rebootRequired ? 'Required' : 'Not required'"></span>
+                        </div>
+                        <div class="system-item">
+                            <span class="system-label">Added</span>
+                            <span x-text="profilePreview?.changes?.added?.length || 0"></span>
+                        </div>
+                        <div class="system-item">
+                            <span class="system-label">Updated</span>
+                            <span x-text="profilePreview?.changes?.updated?.length || 0"></span>
+                        </div>
+                        <div class="system-item">
+                            <span class="system-label">Removed</span>
+                            <span x-text="profilePreview?.changes?.removed?.length || 0"></span>
+                        </div>
+                        <div class="system-item">
+                            <span class="system-label">Preserved</span>
+                            <span x-text="profilePreview?.changes?.preserved?.length || 0"></span>
+                        </div>
+                    </div>
+
+                    <div class="profile-preview-section" x-show="profilePreview?.summary?.length">
+                        <h3 class="routing-section-title">Summary</h3>
+                        <ul class="profile-list">
+                            <template x-for="(item, idx) in profilePreview.summary" :key="idx">
+                                <li x-text="item"></li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    <div class="profile-preview-section" x-show="profilePreview?.warnings?.length">
+                        <h3 class="routing-section-title">Warnings</h3>
+                        <ul class="profile-list profile-list-warn">
+                            <template x-for="(item, idx) in profilePreview.warnings" :key="idx">
+                                <li x-text="item"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-outline" @click="closeProfilePreview()">Cancel</button>
+                    <button class="btn btn-success"
+                            @click="applyProfileImport()"
+                            :disabled="loading.profileApply || !profilePreview">
+                        Apply & Restart
+                    </button>
                 </div>
             </div>
         </div>

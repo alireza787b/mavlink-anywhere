@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 
 	"github.com/alireza787b/mavlink-anywhere/dashboard/internal/config"
 )
@@ -48,8 +47,8 @@ func (s *Server) putConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := os.WriteFile(s.configPath, []byte(payload.Raw), 0644); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to write config: "+err.Error())
+	if err := config.WriteRawConfig(s.configPath, s.envPath, payload.Raw); err != nil {
+		writeError(w, http.StatusBadRequest, "Failed to write config: "+err.Error())
 		return
 	}
 

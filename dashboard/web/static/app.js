@@ -15,6 +15,11 @@ function dashboard() {
             docs: {},
             firewall: {},
         },
+        profileBackups: [],
+        profileFileName: '',
+        profileImportMode: 'replace',
+        profilePreview: null,
+        profileDraft: null,
         logLines: [],
         logsPaused: false,
         templates: [],
@@ -24,6 +29,7 @@ function dashboard() {
         showRawConfig: false,
         showAddWizard: false,
         showEditModal: false,
+        showProfilePreview: false,
 
         // Loading flags
         loading: {
@@ -31,6 +37,9 @@ function dashboard() {
             config: false,
             add: false,
             edit: false,
+            profilePreview: false,
+            profileApply: false,
+            profileRestore: false,
         },
 
         // Wizard state
@@ -100,6 +109,10 @@ function dashboard() {
             return `[UdpEndpoint ${name}]\nMode=${mode}\nAddress=${addr}\nPort=${port}`;
         },
 
+        get latestProfileBackup() {
+            return this.profileBackups.length > 0 ? this.profileBackups[0] : null;
+        },
+
         endpointModeLabel(ep) {
             if (ep.type === 'UartEndpoint') return 'UART';
             if (ep.mode === 'server') return 'SERVER';
@@ -122,6 +135,7 @@ function dashboard() {
                 this.loadConfig(),
                 this.loadSystemInfo(),
                 this.loadDiagnostics(),
+                this.loadProfileBackups(),
                 this.loadTemplates(),
                 this.loadRecentLogs(),
             ]);
@@ -190,6 +204,15 @@ function dashboard() {
             } catch (e) { /* ignore */ }
         },
 
+        async loadProfileBackups() {
+            try {
+                const data = await this.api('GET', '/profiles/backups');
+                this.profileBackups = data.backups || [];
+            } catch (e) {
+                this.profileBackups = [];
+            }
+        },
+
         async loadDiagnostics() {
             try {
                 this.diagnostics = await this.api('GET', '/diagnostics');
@@ -225,6 +248,8 @@ function dashboard() {
                 await this.api('PUT', '/config', { raw: this.rawConfig });
                 this.toast('success', 'Config saved');
                 await this.loadEndpoints();
+                await this.loadInput();
+                await this.loadDiagnostics();
             } catch (e) {
                 this.toast('error', 'Failed to save: ' + e.message);
             } finally {
@@ -251,6 +276,8 @@ function dashboard() {
                 this.toast('success', `${ep.name} deleted`);
                 await this.loadEndpoints();
                 await this.loadConfig();
+                await this.loadInput();
+                await this.loadDiagnostics();
             } catch (e) {
                 this.toast('error', e.message);
             }
@@ -278,6 +305,7 @@ function dashboard() {
                 this.showEditModal = false;
                 await this.loadEndpoints();
                 await this.loadConfig();
+                await this.loadDiagnostics();
             } catch (e) {
                 this.toast('error', e.message);
             } finally {
@@ -306,6 +334,7 @@ function dashboard() {
                 this.showAddWizard = false;
                 await this.loadEndpoints();
                 await this.loadConfig();
+                await this.loadDiagnostics();
 
                 // Restart service to apply
                 try {
@@ -327,6 +356,134 @@ function dashboard() {
             this.wizardAddr = '';
             this.wizardPort = 0;
             this.wizardMode = 'normal';
+        },
+
+        // Profiles
+        async exportProfile() {
+            try {
+                const data = await this.api('GET', '/profiles/export');
+                const suggested = data.metadata?.profileName || 'routing-profile';
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${suggested}.json`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                this.toast('success', 'Current routing profile exported');
+            } catch (e) {
+                this.toast('error', 'Failed to export profile: ' + e.message);
+            }
+        },
+
+        openProfilePicker() {
+            this.$refs.profileFile.click();
+        },
+
+        async onProfileFileSelected(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                this.profileDraft = JSON.parse(text);
+                this.profileFileName = file.name;
+                await this.refreshProfilePreview();
+                if (this.profilePreview) {
+                    this.showProfilePreview = true;
+                }
+            } catch (e) {
+                this.toast('error', 'Invalid profile file: ' + e.message);
+            } finally {
+                event.target.value = '';
+            }
+        },
+
+        async refreshProfilePreview() {
+            if (!this.profileDraft) return;
+            this.loading.profilePreview = true;
+            try {
+                this.profilePreview = await this.api('POST', '/profiles/preview', {
+                    mode: this.profileImportMode,
+                    profile: this.profileDraft,
+                });
+            } catch (e) {
+                this.profilePreview = null;
+                this.toast('error', 'Profile preview failed: ' + e.message);
+            } finally {
+                this.loading.profilePreview = false;
+            }
+        },
+
+        async applyProfileImport() {
+            if (!this.profileDraft) return;
+            this.loading.profileApply = true;
+            try {
+                const result = await this.api('POST', '/profiles/apply', {
+                    mode: this.profileImportMode,
+                    profile: this.profileDraft,
+                });
+                this.toast('success', 'Routing profile applied');
+                this.showProfilePreview = false;
+                this.profileDraft = null;
+                this.profilePreview = null;
+                await Promise.all([
+                    this.loadStatus(),
+                    this.loadEndpoints(),
+                    this.loadInput(),
+                    this.loadConfig(),
+                    this.loadDiagnostics(),
+                    this.loadProfileBackups(),
+                ]);
+                if (result?.backup?.createdAt) {
+                    this.toast('info', `Backup created at ${this.formatTimestamp(result.backup.createdAt)}`);
+                }
+            } catch (e) {
+                this.toast('error', 'Failed to apply profile: ' + e.message);
+            } finally {
+                this.loading.profileApply = false;
+            }
+        },
+
+        async restoreLatestBackup() {
+            if (!this.latestProfileBackup) {
+                this.toast('error', 'No backup is available to restore');
+                return;
+            }
+            if (!confirm('Restore the most recent routing backup and restart mavlink-router?')) return;
+            this.loading.profileRestore = true;
+            try {
+                await this.api('POST', '/profiles/restore');
+                this.toast('success', 'Latest routing backup restored');
+                await Promise.all([
+                    this.loadStatus(),
+                    this.loadEndpoints(),
+                    this.loadInput(),
+                    this.loadConfig(),
+                    this.loadDiagnostics(),
+                    this.loadProfileBackups(),
+                ]);
+            } catch (e) {
+                this.toast('error', 'Failed to restore backup: ' + e.message);
+            } finally {
+                this.loading.profileRestore = false;
+            }
+        },
+
+        closeProfilePreview() {
+            this.showProfilePreview = false;
+            this.profilePreview = null;
+            this.profileDraft = null;
+            this.profileFileName = '';
+            this.profileImportMode = 'replace';
+        },
+
+        formatTimestamp(value) {
+            if (!value) return 'unknown';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString();
         },
 
         // Log streaming
