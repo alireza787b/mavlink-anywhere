@@ -9,6 +9,12 @@ function dashboard() {
         endpointList: [],
         rawConfig: '',
         systemInfo: {},
+        diagnostics: {
+            mavlink: null,
+            alerts: [],
+            docs: {},
+            firewall: {},
+        },
         logLines: [],
         logsPaused: false,
         templates: [],
@@ -72,6 +78,20 @@ function dashboard() {
             return this.endpointList.filter((ep) => ep.category !== 'input' && ep.mode !== 'server');
         },
 
+        get mavlinkStateClass() {
+            if (!this.diagnostics?.mavlink) return 'status-unknown';
+            if (this.diagnostics.mavlink.active) return 'status-running';
+            if (this.diagnostics.mavlink.available) return 'status-stopped';
+            return 'status-unknown';
+        },
+
+        get mavlinkStateLabel() {
+            if (!this.diagnostics?.mavlink) return 'Unknown';
+            if (this.diagnostics.mavlink.active) return 'Active';
+            if (this.diagnostics.mavlink.available) return 'No Data';
+            return 'Unavailable';
+        },
+
         get wizardPreview() {
             const name = this.wizardName || this.wizardType || 'endpoint';
             const addr = this.wizardAddr || this.selectedTemplate?.defaultAddress || '0.0.0.0';
@@ -101,6 +121,7 @@ function dashboard() {
                 this.loadInput(),
                 this.loadConfig(),
                 this.loadSystemInfo(),
+                this.loadDiagnostics(),
                 this.loadTemplates(),
                 this.loadRecentLogs(),
             ]);
@@ -108,6 +129,7 @@ function dashboard() {
 
             // Poll status every 5 seconds
             setInterval(() => this.loadStatus(), 5000);
+            setInterval(() => this.loadDiagnostics(), 8000);
         },
 
         // API calls
@@ -165,6 +187,12 @@ function dashboard() {
             try {
                 const data = await this.api('GET', '/templates');
                 this.templates = data.templates || [];
+            } catch (e) { /* ignore */ }
+        },
+
+        async loadDiagnostics() {
+            try {
+                this.diagnostics = await this.api('GET', '/diagnostics');
             } catch (e) { /* ignore */ }
         },
 

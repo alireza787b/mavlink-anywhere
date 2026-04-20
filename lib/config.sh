@@ -31,6 +31,8 @@ generate_config_header() {
 # =============================================================================
 
 [General]
+# TCP server for multi-client TCP access and local health probes.
+# This is separate from UDP gcs_listen on 14550.
 TcpServerPort=5760
 ReportStats=false
 
@@ -84,6 +86,8 @@ EOF
 
 # Generate the default GCS listen endpoint (server mode on 14550)
 # Any GCS can connect TO this device — no IP pre-configuration needed.
+# This is intended for ad-hoc field access; explicit localhost outputs should
+# still be used for MAVSDK, mavlink2rest, and other deterministic consumers.
 generate_gcs_listen_endpoint() {
     cat <<EOF
 # Default server-mode endpoint — any GCS can connect to this device on port ${DEFAULT_GCS_LISTEN_PORT}

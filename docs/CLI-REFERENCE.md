@@ -108,6 +108,11 @@ sudo mavlink-anywhere configure --install-dashboard \
     --dashboard-listen 0.0.0.0:9070
 ```
 
+**Dashboard install behavior:**
+- Preferred path: download the matching release binary (`arm6`, `arm64`, `amd64`)
+- Fallback path: build the dashboard locally from source if `go` is installed
+- Final fallback: continue with router-only setup if the dashboard is unavailable
+
 ---
 
 ### status
@@ -304,6 +309,12 @@ Endpoints are specified as `IP:PORT` pairs, comma-separated:
 | 14569 | mavlink2rest | Normal | Web-based REST API |
 | 12550 | Local | Normal | Local monitoring/debugging |
 | 24550 | GCS (VPN) | Normal | Remote ground station over VPN |
+| 5760 | TCP server | TCP | Dynamic multi-client TCP access and dashboard MAVLink probe |
+
+Notes:
+- `gcs_listen` on `14550/udp` is ad-hoc server access and is not a replacement for explicit local outputs
+- An explicit outbound UDP endpoint to `remote-ip:14550` can coexist with local `gcs_listen`
+- Avoid feeding the same remote GCS from both paths at the same time
 
 ### Named Shortcuts (in config files)
 

@@ -31,6 +31,7 @@ func (s *Server) Router() http.Handler {
 	// API v1 routes
 	mux.HandleFunc("/api/v1/status", s.handleStatus)
 	mux.HandleFunc("/api/v1/health", s.handleHealth)
+	mux.HandleFunc("/api/v1/diagnostics", s.handleDiagnostics)
 	mux.HandleFunc("/api/v1/config", s.handleConfig)
 	mux.HandleFunc("/api/v1/endpoints", s.handleEndpoints)
 	mux.HandleFunc("/api/v1/endpoints/", s.handleEndpointByName)

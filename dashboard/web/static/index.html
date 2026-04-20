@@ -81,6 +81,85 @@
             </div>
         </div>
 
+        <div class="card-row">
+            <div class="card">
+                <div class="card-header-row">
+                    <h2 class="card-title">MAVLink Health</h2>
+                    <span class="status-badge" :class="mavlinkStateClass" x-text="mavlinkStateLabel"></span>
+                </div>
+                <div class="system-grid" x-show="diagnostics.mavlink">
+                    <div class="system-item">
+                        <span class="system-label">Source</span>
+                        <span x-text="diagnostics.mavlink?.source || 'Unknown'"></span>
+                    </div>
+                    <div class="system-item">
+                        <span class="system-label">Probe</span>
+                        <span x-text="'TCP ' + (diagnostics.mavlink?.tcpServerPort || 0)"></span>
+                    </div>
+                    <div class="system-item">
+                        <span class="system-label">Bytes</span>
+                        <span x-text="diagnostics.mavlink?.bytesReceived || 0"></span>
+                    </div>
+                    <div class="system-item">
+                        <span class="system-label">Packets</span>
+                        <span x-text="diagnostics.mavlink?.parsedPackets || 0"></span>
+                    </div>
+                    <div class="system-item">
+                        <span class="system-label">Heartbeats</span>
+                        <span x-text="diagnostics.mavlink?.heartbeats || 0"></span>
+                    </div>
+                    <div class="system-item">
+                        <span class="system-label">Window</span>
+                        <span x-text="(diagnostics.mavlink?.sampleWindowMs || 0) + ' ms'"></span>
+                    </div>
+                    <div class="system-item" x-show="diagnostics.mavlink?.systemId">
+                        <span class="system-label">System</span>
+                        <span x-text="'sys ' + diagnostics.mavlink.systemId + ' · comp ' + diagnostics.mavlink.componentId"></span>
+                    </div>
+                    <div class="system-item" x-show="diagnostics.mavlink?.vehicleType">
+                        <span class="system-label">Vehicle</span>
+                        <span x-text="diagnostics.mavlink.vehicleType"></span>
+                    </div>
+                    <div class="system-item" x-show="diagnostics.mavlink?.autopilot">
+                        <span class="system-label">Autopilot</span>
+                        <span x-text="diagnostics.mavlink.autopilot"></span>
+                    </div>
+                    <div class="system-item" x-show="diagnostics.mavlink?.systemStatus">
+                        <span class="system-label">State</span>
+                        <span x-text="diagnostics.mavlink.systemStatus"></span>
+                    </div>
+                </div>
+                <div class="detail-line" x-show="diagnostics.mavlink?.note">
+                    <span x-text="diagnostics.mavlink.note"></span>
+                </div>
+                <div class="detail-line text-warn" x-show="diagnostics.mavlink?.error">
+                    <span x-text="diagnostics.mavlink.error"></span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header-row">
+                    <h2 class="card-title">Warnings</h2>
+                    <span class="badge" :class="diagnostics.alerts?.length ? 'badge-yellow' : 'badge-green'"
+                          x-text="diagnostics.alerts?.length || 0"></span>
+                </div>
+                <div class="empty-state" x-show="!diagnostics.alerts || diagnostics.alerts.length === 0">
+                    No config or firewall warnings detected.
+                </div>
+                <template x-for="alert in diagnostics.alerts" :key="alert.code">
+                    <div class="warning-card" :class="'warning-' + alert.level">
+                        <div class="warning-title-row">
+                            <strong x-text="alert.title"></strong>
+                            <span class="badge badge-neutral" x-text="alert.level"></span>
+                        </div>
+                        <div class="warning-detail" x-text="alert.detail"></div>
+                        <div class="warning-hint" x-show="alert.hint" x-text="alert.hint"></div>
+                        <a class="doc-link" x-show="alert.docUrl" :href="alert.docUrl" target="_blank" rel="noreferrer">Open docs</a>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- Routing -->
         <div class="card">
             <div class="card-header-row">
@@ -89,6 +168,7 @@
                     <button class="btn btn-sm btn-outline" @click="showAddWizard = true">+ Add Endpoint</button>
                     <button class="btn btn-sm btn-outline" @click="showRawConfig = !showRawConfig"
                             x-text="showRawConfig ? 'Card View' : 'Raw Config'"></button>
+                    <a class="btn btn-sm btn-outline doc-btn" :href="diagnostics.docs?.dashboard" target="_blank" rel="noreferrer">Docs</a>
                 </div>
             </div>
 

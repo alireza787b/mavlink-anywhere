@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.4
+# Version: 3.0.5
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -119,7 +119,7 @@ DASHBOARD_LISTEN=""
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.4
+MAVLink-Anywhere Configuration Script v3.0.5
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -509,6 +509,8 @@ generate_config_inline() {
     if [[ "$input_type" == "uart" ]]; then
         sudo bash -c "cat > /etc/mavlink-router/main.conf" <<EOF
 [General]
+# TCP server for multi-client TCP access and local health probes.
+# This is separate from UDP gcs_listen on 14550.
 TcpServerPort=5760
 ReportStats=false
 
@@ -518,6 +520,7 @@ Baud=${uart_baud}
 
 # Default server-mode endpoint — any GCS can connect to this device on port 14550
 # QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port 14550
+# Best for ad-hoc field access; keep explicit localhost outputs for local consumers.
 [UdpEndpoint gcs_listen]
 Mode=server
 Address=0.0.0.0
@@ -527,6 +530,8 @@ EOF
     else
         sudo bash -c "cat > /etc/mavlink-router/main.conf" <<EOF
 [General]
+# TCP server for multi-client TCP access and local health probes.
+# This is separate from UDP gcs_listen on 14550.
 TcpServerPort=5760
 ReportStats=false
 
@@ -540,6 +545,7 @@ EOF
         if [[ "${input_port}" != "14550" ]]; then
             sudo bash -c "cat >> /etc/mavlink-router/main.conf" <<EOF
 # Default server-mode endpoint — any GCS can connect to this device on port 14550
+# Best for ad-hoc field access; keep explicit localhost outputs for local consumers.
 [UdpEndpoint gcs_listen]
 Mode=server
 Address=0.0.0.0
@@ -868,6 +874,8 @@ EOF
     sudo mkdir -p /etc/mavlink-router
     sudo bash -c "cat > /etc/mavlink-router/main.conf" <<EOF
 [General]
+# TCP server for multi-client TCP access and local health probes.
+# This is separate from UDP gcs_listen on 14550.
 TcpServerPort=5760
 ReportStats=false
 
@@ -877,6 +885,7 @@ Baud=${UART_BAUD}
 
 # Default server-mode endpoint — any GCS can connect to this device on port 14550
 # QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port 14550
+# Best for ad-hoc field access; keep explicit localhost outputs for local consumers.
 [UdpEndpoint gcs_listen]
 Mode=server
 Address=0.0.0.0

@@ -241,6 +241,9 @@ func AddEndpoint(path string, ep endpoints.Endpoint) error {
 			return fmt.Errorf("endpoint %q already exists", ep.Name)
 		}
 	}
+	if err := ValidateEndpointTopology(pc.Endpoints, ep, ""); err != nil {
+		return err
+	}
 
 	ep.Enabled = true
 	pc.Endpoints = append(pc.Endpoints, ep)
@@ -260,6 +263,9 @@ func UpdateEndpoint(path string, name string, ep endpoints.Endpoint) error {
 			ep.Type = existing.Type
 			if ep.Type == "" {
 				ep.Type = "UdpEndpoint"
+			}
+			if err := ValidateEndpointTopology(pc.Endpoints, ep, name); err != nil {
+				return err
 			}
 			pc.Endpoints[i] = ep
 			found = true

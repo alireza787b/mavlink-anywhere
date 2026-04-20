@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Dashboard Management
 # =============================================================================
-# Version: 3.0.4
+# Version: 3.0.5
 # Description: Install, configure, and manage the web dashboard binary
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -99,6 +99,52 @@ install_dashboard_binary() {
         rm -f "$tmp_file"
         return 1
     fi
+}
+
+# Build the dashboard binary from the local source tree.
+# This is used as a fallback when a release asset is unavailable for the host
+# architecture. It intentionally avoids the caller's default Go cache so it can
+# run in minimal environments.
+build_dashboard_binary_from_source() {
+    local repo_root dashboard_dir tmp_bin cache_dir version build_time
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    dashboard_dir="${repo_root}/dashboard"
+
+    if [[ ! -f "${dashboard_dir}/go.mod" ]]; then
+        ma_log_warn "Dashboard source tree not found at ${dashboard_dir}"
+        return 1
+    fi
+
+    if ! ma_command_exists go; then
+        ma_log_warn "Go toolchain not found — cannot build dashboard from source"
+        return 1
+    fi
+
+    ma_log_step "Building dashboard binary from local source..."
+
+    tmp_bin=$(mktemp /tmp/mavlink-anywhere-dashboard.XXXXXX)
+    cache_dir=$(mktemp -d /tmp/mavlink-anywhere-go-cache.XXXXXX)
+    version="${MAVLINK_ANYWHERE_VERSION}"
+    build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    if (
+        cd "$dashboard_dir" && \
+        env GOCACHE="$cache_dir" CGO_ENABLED=0 \
+            go build -ldflags "-s -w -X main.Version=${version} -X main.BuildTime=${build_time}" \
+            -o "$tmp_bin" ./cmd/
+    ); then
+        ma_ensure_dir "$DASHBOARD_INSTALL_DIR"
+        mv "$tmp_bin" "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
+        chmod +x "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
+        rm -rf "$cache_dir"
+        ma_log_success "Dashboard binary built from source: ${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
+        return 0
+    fi
+
+    rm -f "$tmp_bin"
+    rm -rf "$cache_dir"
+    ma_log_warn "Local dashboard source build failed"
+    return 1
 }
 
 # =============================================================================
@@ -205,9 +251,12 @@ install_dashboard() {
     # Try to download binary
     if ! is_dashboard_installed; then
         if ! install_dashboard_binary; then
-            ma_log_warn "Dashboard binary download failed — skipping dashboard setup"
-            ma_log_info "You can install it later: sudo ${DASHBOARD_INSTALL_DIR}/configure_mavlink_router.sh --install-dashboard"
-            return 1
+            if ! build_dashboard_binary_from_source; then
+                ma_log_warn "Dashboard install failed — skipping dashboard setup"
+                ma_log_info "You can install it later: sudo ${DASHBOARD_INSTALL_DIR}/configure_mavlink_router.sh --install-dashboard"
+                ma_log_info "If release assets are unavailable, install Go and rerun to build the dashboard locally."
+                return 1
+            fi
         fi
     elif ! dashboard_binary_is_current; then
         ma_log_info "Updating dashboard binary: $(get_dashboard_version) -> v${MAVLINK_ANYWHERE_VERSION}"

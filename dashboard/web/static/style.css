@@ -22,6 +22,7 @@
     --yellow: #eab308;
     --yellow-dim: #854d0e;
     --orange: #f97316;
+    --blue-dim: #1d4ed8;
     --radius: 8px;
     --radius-sm: 4px;
     --shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -211,7 +212,9 @@ body {
 }
 
 .badge-green { background: var(--green-dim); color: var(--green); }
+.badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
 .badge-gray { background: #333; color: var(--text-muted); }
+.badge-neutral { background: #2b2f3b; color: var(--text-muted); text-transform: uppercase; }
 
 /* Input source */
 .input-details { font-size: 0.9rem; }
@@ -284,16 +287,90 @@ body {
 .endpoint-card:hover { border-color: var(--border-light); }
 .endpoint-disabled { opacity: 0.5; }
 
+.warning-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: rgba(255,255,255,0.01);
+}
+
+.warning-critical {
+    border-color: rgba(239, 68, 68, 0.45);
+}
+
+.warning-warning {
+    border-color: rgba(234, 179, 8, 0.45);
+}
+
+.warning-info {
+    border-color: rgba(59, 130, 246, 0.45);
+}
+
+.warning-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.warning-detail {
+    color: var(--text);
+    font-size: 0.88rem;
+    margin-bottom: 4px;
+}
+
+.warning-hint {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin-bottom: 6px;
+}
+
+.doc-link {
+    color: #93c5fd;
+    font-size: 0.82rem;
+    text-decoration: none;
+}
+
+.doc-link:hover {
+    text-decoration: underline;
+}
+
+.doc-btn {
+    text-decoration: none;
+}
+
 .endpoint-header {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 6px;
+    flex-wrap: wrap;
 }
 
 .endpoint-name {
     font-weight: 600;
     font-size: 0.9rem;
+}
+
+.role-badge {
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.role-input {
+    background: #14304d;
+    color: #93c5fd;
+}
+
+.role-output {
+    background: #262934;
+    color: var(--text-muted);
 }
 
 .mode-badge {

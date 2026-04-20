@@ -8,7 +8,9 @@
 # =============================================================================
 
 [General]
-# TCP server port for QGroundControl and other TCP clients
+# TCP server port for multi-client TCP access and local health probes.
+# PX4 SITL does not reserve this port by default; a conflict only exists if
+# another local service explicitly binds 5760.
 TcpServerPort=5760
 
 # Disable statistics reporting
@@ -36,6 +38,8 @@ Baud=${UART_BAUD}
 # Any GCS on the network can connect TO this device on port 14550.
 # QGC/Mission Planner: Add connection -> UDP -> this device's IP -> port 14550
 # No pre-configuration needed on this device — just point your GCS here.
+# This is best for ad-hoc field access. Keep explicit localhost outputs for
+# MAVSDK, mavlink2rest, and similar local consumers.
 
 [UdpEndpoint gcs_listen]
 Mode=server

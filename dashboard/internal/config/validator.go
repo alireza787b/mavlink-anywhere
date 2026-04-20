@@ -30,6 +30,16 @@ func ValidatePort(port int) error {
 	return nil
 }
 
+// ValidateEndpointMode ensures endpoint mode is supported.
+func ValidateEndpointMode(mode string) error {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "normal", "server":
+		return nil
+	default:
+		return fmt.Errorf("unsupported endpoint mode: %s", mode)
+	}
+}
+
 // ValidateEndpointName checks endpoint name validity.
 func ValidateEndpointName(name string) error {
 	if name == "" {

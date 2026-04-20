@@ -21,13 +21,16 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
 
 - **Service Status** — See if mavlink-router is running, uptime, and version at a glance
 - **Routing View** — Input source is separated from listener and output routes
-- **Endpoint Management** — View, add, edit, delete, and toggle MAVLink routes
+- **Endpoint Management** — View, add, edit, delete, and toggle MAVLink endpoints
+- **MAVLink Health** — Passive runtime probe of the routed stream (bytes, packets, heartbeat, system IDs)
+- **Warnings & Guidance** — Detect missing input, firewall issues, duplicate server binds, and mixed routing patterns
 - **Guided Add Wizard** — Step-by-step wizard for adding new endpoints (GCS, local services, VPN)
 - **Live Logs** — Real-time streaming of mavlink-router logs via SSE
 - **Service Control** — Start, stop, restart mavlink-router from the browser
 - **System Info** — Board detection, UART status, firewall info, RAM usage
 - **Raw Config Editor** — Advanced users can edit the INI config directly
 - **Default Server Endpoint** — Port 14550 listens for any GCS connection out of the box
+- **Source Visibility** — The active MAVLink source is shown separately from output endpoints
 
 ## Architecture
 
@@ -38,6 +41,7 @@ The dashboard is a single static Go binary (~7MB) with the web UI embedded. It:
 - Streams logs via `journalctl`
 - Runs as a separate systemd service (`mavlink-anywhere-dashboard`)
 - Uses <20MB RAM (hard-capped at 30MB via systemd MemoryMax)
+- Works without Node/npm at runtime
 
 ## Installation
 
@@ -68,6 +72,8 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
   --dashboard-listen 0.0.0.0:9070
 ```
 
+On supported release architectures (`arm6`, `arm64`, `amd64`), the installer downloads a prebuilt binary. If that download is unavailable and `go` is installed locally, the installer falls back to a local source build. If neither path succeeds, mavlink-router still installs and the dashboard is skipped.
+
 ### Manual
 
 Download the binary for your architecture from [GitHub Releases](https://github.com/alireza787b/mavlink-anywhere/releases):
@@ -93,6 +99,16 @@ Then start manually:
 
 ```bash
 ./mavlink-anywhere --listen 127.0.0.1:9070
+```
+
+### Manual Source Build
+
+If your architecture does not have a published release asset, build the dashboard directly:
+
+```bash
+cd dashboard
+CGO_ENABLED=0 go build -o ../mavlink-anywhere ./cmd/
+sudo install -m 755 ../mavlink-anywhere /opt/mavlink-anywhere/mavlink-anywhere
 ```
 
 ## Systemd Service
@@ -133,7 +149,16 @@ As of v3.0.0, mavlink-anywhere includes a default **server-mode** endpoint on po
 
 - Any GCS (QGroundControl, Mission Planner) can connect TO the device by pointing at its IP:14550
 - No pre-configuration of GCS IP is needed on the device
-- Works out of the box for ad-hoc connections
+- Works out of the box for ad-hoc connections after the GCS sends first
+
+Important routing notes:
+
+- `gcs_listen` is best for ad-hoc field access, not deterministic multi-client fanout
+- UDP server mode effectively tracks the last active sender on that endpoint
+- Local consumers such as MAVSDK (`127.0.0.1:14540`) and mavlink2rest (`127.0.0.1:14569`) should remain explicit normal-mode endpoints
+- An explicit outbound endpoint to a remote `:14550` can coexist with `gcs_listen` without a local bind conflict
+- The same remote GCS should not consume both paths at once, or it may see duplicate telemetry
+- For multiple dynamic remote clients, prefer the default TCP server on `5760`
 
 This uses `mavlink-router` UDP **server mode**, so the router sends replies to the IP:port of the **last client that sent traffic** on that endpoint. Treat it as a convenient device-side listener, not as a multi-client fanout bus.
 
@@ -143,6 +168,20 @@ If you need multiple simultaneous remote consumers:
 - Or use the default TCP server on port `5760`
 
 **QGroundControl**: Comm Links → Add → UDP → Server: `<device-ip>` → Port: `14550`
+
+If you delete `gcs_listen`, use **Add Endpoint** and choose **Listen for GCS** to restore it.
+
+## TCP Server (Port 5760)
+
+`mavlink-router` listens on `5760/tcp` by default. Any TCP client connecting there can send and receive routed MAVLink data.
+
+Use this when you want:
+
+- multiple dynamic clients without predefining every remote IP
+- a clean TCP path for tools that prefer `tcp://` connections
+- a lightweight read-only health probe from the dashboard
+
+PX4 SITL does not reserve `5760` by default. PX4's documented simulator defaults are UDP `14550`/`14540` plus simulator TCP `4560`. A conflict only exists if your own SITL stack or another service explicitly binds `5760`.
 
 ## Update Workflow
 
@@ -177,6 +216,7 @@ The dashboard exposes a REST API for programmatic access:
 
 ```
 GET    /api/v1/status              # Service status, version, board info
+GET    /api/v1/diagnostics         # MAVLink probe, warnings, docs links
 GET    /api/v1/config              # Current config as JSON
 PUT    /api/v1/config              # Write raw config
 GET    /api/v1/endpoints           # List all endpoints
@@ -205,6 +245,14 @@ GET    /api/v1/health              # Health check
 | Raspberry Pi 3/4/5 | arm64 | `linux-arm64` | Full support |
 | NVIDIA Jetson | arm64 | `linux-arm64` | Full support |
 | Ubuntu/Debian x86 | amd64 | `linux-amd64` | Full support |
+
+If your Linux architecture is outside this list, use CLI-only mode or the manual source build above.
+
+## Not Yet Implemented
+
+- Profile import/export/diff/replace for full endpoint sets
+- Token-based auth for non-local dashboard exposure
+- Deep FC sensor/firmware discovery beyond passive routed-stream detection
 
 ## Troubleshooting
 

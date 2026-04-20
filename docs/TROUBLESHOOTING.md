@@ -228,6 +228,8 @@ sudo journalctl -u mavlink-router -n 100
    sudo lsof -i :5760  # Check TCP port
    sudo lsof -i :14550 # Check UDP port
    ```
+   `14550/udp` conflicts only when another local process binds the same address/port.
+   An outbound UDP endpoint that sends to a remote `:14550` is not a local bind conflict.
 
 ---
 
@@ -286,6 +288,8 @@ ss -ulpn | grep mavlink
 ### Can't Connect from QGroundControl
 
 **Quick fix (v3.0.0+):** Your device should have a default server endpoint on port 14550. In QGC, add a UDP connection pointing to `<device-ip>:14550`. This works because QGC sends first, allowing the router to learn the active remote IP:port.
+
+If you need multiple dynamic remote clients at once, prefer the default TCP server on `5760` instead of relying only on UDP server mode.
 
 **Checklist:**
 

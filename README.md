@@ -52,22 +52,20 @@ You should see `active (running)`. Connect your ground station to the configured
 
 ### Step 4: Open Dashboard (Optional)
 
-The configure script automatically installs a web dashboard bound to localhost by default:
+The configure script automatically installs a web dashboard bound to localhost by default. On supported release architectures it downloads a prebuilt binary; if that asset is unavailable, it falls back to a local Go source build before dropping back to CLI-only mode.
 
 ```
 http://127.0.0.1:9070
 ```
 
-Manage endpoints, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
+Manage endpoints, inspect MAVLink health, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
 To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
 
 ## ✅ That's It!
 
 The configure script handles everything - platform detection, serial setup, configuration, and dashboard.
 
-**Default GCS listener:** `mavlink-anywhere` creates a server-mode listener on `14550/udp`, so QGroundControl can point to `<device-ip>:14550` without pre-configuring a remote IP on the device.
-
-**Important:** This follows `mavlink-router` UDP server semantics: the active remote is the **last sender** on that listener. If you need simultaneous remote consumers, add explicit `Mode=Normal` endpoints for each destination or use the built-in TCP server.
+`gcs_listen` on `14550/udp` is enabled by default for ad-hoc field access, so QGroundControl can point to `<device-ip>:14550` without pre-configuring a remote IP on the device. This follows `mavlink-router` UDP server semantics: the active remote is the last sender on that listener. Keep local consumers such as MAVSDK and mavlink2rest on explicit localhost endpoints, and use explicit `Mode=Normal` endpoints or the built-in TCP server on `5760/tcp` when you need deterministic or multi-client remote access.
 
 ---
 
@@ -199,6 +197,8 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
 | **Generic Linux** | Manual | Ensure UART device exists |
 | **USB Serial** | None needed | Just plug in adapter |
 | **UDP Input** | None needed | For SITL/simulation |
+
+Dashboard release binaries are published for `arm6`, `arm64`, and `amd64`. On other Linux architectures, the configure script will try a local Go build if `go` is installed; otherwise the router still works without the dashboard.
 
 ---
 
