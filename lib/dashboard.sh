@@ -58,6 +58,20 @@ dashboard_binary_is_current() {
     [[ -n "$installed_version" && "$installed_version" == *" v${MAVLINK_ANYWHERE_VERSION} "* ]]
 }
 
+dashboard_binary_looks_valid() {
+    local binary_path="$1"
+    local magic=""
+
+    if ma_command_exists file; then
+        file "$binary_path" 2>/dev/null | grep -qE "ELF|executable"
+        return $?
+    fi
+
+    ma_log_debug "'file' utility not available; falling back to ELF header validation"
+    magic=$(dd if="$binary_path" bs=1 count=4 2>/dev/null | od -An -tx1 2>/dev/null | tr -d '[:space:]')
+    [[ "$magic" == "7f454c46" ]]
+}
+
 # Download and install the dashboard binary from GitHub Releases.
 # This is a best-effort operation — failure does NOT block mavlink-router setup.
 install_dashboard_binary() {
@@ -83,14 +97,14 @@ install_dashboard_binary() {
 
     if curl -fsSL --connect-timeout 15 --max-time 120 -o "$tmp_file" "$download_url" 2>/dev/null; then
         # Verify it's a real binary (not an HTML error page)
-        if file "$tmp_file" | grep -qE "ELF|executable"; then
+        if dashboard_binary_looks_valid "$tmp_file"; then
             ma_ensure_dir "$DASHBOARD_INSTALL_DIR"
             mv "$tmp_file" "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
             chmod +x "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
             ma_log_success "Dashboard binary installed: ${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
             return 0
         else
-            ma_log_warn "Downloaded file is not a valid binary (release may not exist yet)"
+            ma_log_warn "Downloaded file is not a valid dashboard binary (release may not exist yet)"
             rm -f "$tmp_file"
             return 1
         fi

@@ -52,7 +52,7 @@ You should see `active (running)`. Connect your ground station to the configured
 
 ### Step 4: Open Dashboard (Optional)
 
-The configure script automatically installs a web dashboard bound to localhost by default. On supported release architectures it downloads a prebuilt binary; if that asset is unavailable, it falls back to a local Go source build before dropping back to CLI-only mode.
+The configure script automatically installs a web dashboard bound to localhost by default. On supported release architectures it downloads a prebuilt binary; if that asset is unavailable, it falls back to a local Go source build before dropping back to CLI-only mode. Minimal hosts do not need the external `file(1)` package for dashboard installation.
 
 ```
 http://127.0.0.1:9070

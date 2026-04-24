@@ -73,7 +73,7 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
   --dashboard-listen 0.0.0.0:9070
 ```
 
-On supported release architectures (`arm6`, `arm64`, `amd64`), the installer downloads a prebuilt binary. If that download is unavailable and `go` is installed locally, the installer falls back to a local source build. If neither path succeeds, mavlink-router still installs and the dashboard is skipped.
+On supported release architectures (`arm6`, `arm64`, `amd64`), the installer downloads a prebuilt binary. If that download is unavailable and `go` is installed locally, the installer falls back to a local source build. If neither path succeeds, mavlink-router still installs and the dashboard is skipped. Minimal hosts do not need the external `file(1)` package for the download validation step.
 
 ### Manual
 
