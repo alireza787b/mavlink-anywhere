@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Hardware Detection
 # =============================================================================
-# Version: 3.0.6
+# Version: 3.0.7
 # Description: UART/USB detection, board identification, serial status checking
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
