@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Dashboard Management
 # =============================================================================
-# Version: 3.0.7
+# Version: 3.0.8
 # Description: Install, configure, and manage the web dashboard binary
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -204,6 +204,7 @@ setup_dashboard_service() {
     fi
 
     ma_log_step "Setting up dashboard service..."
+    ma_ensure_dir "$MAVLINK_ROUTER_CONFIG_DIR"
 
     # Write service file
     generate_dashboard_service "$listen_addr" > "$DASHBOARD_SERVICE_FILE"
