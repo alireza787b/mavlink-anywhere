@@ -135,9 +135,13 @@ sudo systemctl disable mavlink-anywhere-dashboard
 | Access | Auth Required | Rationale |
 |--------|--------------|-----------|
 | `127.0.0.1:9070` (default) | None | Same trust level as SSH |
-| `0.0.0.0:9070` (explicit) | None | Use only on trusted networks, VPNs, or behind SSH tunneling |
+| `0.0.0.0:9070` (explicit) | Mutating APIs require `MAVLINK_ANYWHERE_API_TOKEN` | Use only on a VPN/trusted admin network; read-only APIs still expose topology, system, and log metadata |
 
-The dashboard binds to `127.0.0.1` by default — it's only accessible from the device itself or via SSH tunnel. To expose it on the network:
+The dashboard binds to `127.0.0.1` by default; it is only accessible from the
+device itself or via SSH tunnel. Before exposing it on a network, set
+`MAVLINK_ANYWHERE_API_TOKEN`, restrict access with firewall/VPN policy, and
+understand that read-only API responses may reveal routing topology and system
+metadata. To expose it explicitly:
 
 ```bash
 sudo ./configure_mavlink_router.sh --install-dashboard \
@@ -221,8 +225,13 @@ GET    /api/v1/diagnostics         # MAVLink probe, warnings, docs links
 GET    /api/v1/config              # Current config as JSON
 PUT    /api/v1/config              # Write raw config
 GET    /api/v1/profiles/export     # Export current effective routing profile
+GET    /api/v1/profiles/summary    # Redacted fleet summary, endpoint policy, source overlay hash
+POST   /api/v1/profiles/validate   # Validate a fleet endpoint-policy baseline
+POST   /api/v1/profiles/diff       # Compare a baseline while preserving node hardware input
+POST   /api/v1/profiles/import     # Stage a dry-run fleet reconcile plan
 POST   /api/v1/profiles/preview    # Validate and preview imported profile
-POST   /api/v1/profiles/apply      # Apply imported profile with backup
+POST   /api/v1/profiles/apply      # Legacy local apply or confirmed fleet dry-run apply
+POST   /api/v1/profiles/promote-reference-draft # Export endpoint-policy draft only
 GET    /api/v1/profiles/backups    # List routing backups
 POST   /api/v1/profiles/restore    # Restore the latest backup
 GET    /api/v1/endpoints           # List all endpoints
@@ -293,9 +302,37 @@ Restore workflow:
 - it writes both the config file and the companion env file
 - it restarts `mavlink-router` after restore
 
+## Fleet Profile Control
+
+MDS Fleet Ops uses the dashboard API for endpoint-policy reconciliation. It does
+not overwrite node hardware input settings by default.
+
+Policy modes:
+
+- `observe`: validate and report only; apply is rejected.
+- `local`: node-local dashboard/API remains authoritative; apply is rejected.
+- `fleet-merge`: apply named baseline endpoints, preserve the hardware input
+  overlay, and preserve local non-baseline output endpoints.
+- `fleet-strict`: apply named baseline endpoints and prune local non-baseline
+  outputs only after advanced confirmation. Hardware input overlay is still
+  preserved.
+
+Safety rules:
+
+- `/api/v1/profiles/import` requires `dry_run=true` and stores an in-memory
+  plan with a confirmation token.
+- `/api/v1/profiles/apply` accepts either the legacy local dashboard
+  `{profile, mode}` request or a fleet `{dry_run_id, confirmation}` request.
+  Fleet confirmation accepts `confirmation.confirmation_token`; `token` is kept
+  as a backward-compatible alias for direct sidecar clients.
+- Remote mutating requests require `MAVLINK_ANYWHERE_API_TOKEN`; loopback
+  remains usable for standalone local operation when the token is unset.
+- If the config write succeeds but the companion environment write fails, the
+  previous config/env files are restored.
+
 ## Not Yet Implemented
 
-- Token-based auth for non-local dashboard exposure
+- Per-user dashboard login and CSRF protection for broad non-local exposure
 - Deep FC sensor/firmware discovery beyond passive routed-stream detection
 
 ## Troubleshooting

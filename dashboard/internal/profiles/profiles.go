@@ -1,6 +1,8 @@
 package profiles
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,6 +21,9 @@ const (
 
 	ModeReplace = "replace"
 	ModeMerge   = "merge_endpoints"
+
+	SidecarProfileSchema = "mds.sidecar_profile.v1"
+	HashSemantics        = "sha256:canonical-sanitized-payload:12"
 )
 
 type Metadata struct {
@@ -64,6 +69,12 @@ type BackupInfo struct {
 	ConfigBackup string `json:"configBackup"`
 	EnvBackup    string `json:"envBackup"`
 	MetadataPath string `json:"metadataPath"`
+}
+
+type FleetProfileRequest struct {
+	Mode     string  `json:"mode"`
+	DryRun   bool    `json:"dry_run"`
+	Baseline Profile `json:"baseline"`
 }
 
 type backupMetadata struct {
@@ -275,6 +286,237 @@ func RestoreLatest(configPath, envPath string) (BackupInfo, error) {
 		return BackupInfo{}, err
 	}
 	return latest, nil
+}
+
+func NormalizePolicyMode(mode string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	if normalized == "" {
+		normalized = "local"
+	}
+	switch normalized {
+	case "observe", "local", "fleet-merge", "fleet-strict":
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("unsupported profile mode: %q", mode)
+	}
+}
+
+func FleetSummary(pc *config.ParsedConfig, source string, path string) map[string]any {
+	if pc == nil {
+		return map[string]any{
+			"schema":         SidecarProfileSchema,
+			"backend":        "mavlink-anywhere",
+			"kind":           Kind,
+			"source":         source,
+			"path":           path,
+			"present":        false,
+			"hash":           nil,
+			"hash_semantics": HashSemantics,
+			"profile_count":  0,
+			"secret_status":  "missing",
+			"endpoints":      []map[string]any{},
+			"overlay":        map[string]any{},
+		}
+	}
+	return map[string]any{
+		"schema":         SidecarProfileSchema,
+		"backend":        "mavlink-anywhere",
+		"kind":           Kind,
+		"source":         source,
+		"path":           path,
+		"present":        true,
+		"hash":           FleetHash(pc),
+		"hash_semantics": HashSemantics,
+		"profile_count":  len(nonInputEndpoints(pc.Endpoints)),
+		"secret_status":  "missing",
+		"endpoints":      sanitizedEndpoints(nonInputEndpoints(pc.Endpoints)),
+		"overlay": map[string]any{
+			"hardware_source": sanitizedEndpoints(inputEndpoints(pc.Endpoints)),
+			"overlay_hash":    overlayHash(pc),
+		},
+	}
+}
+
+func FleetReferenceDraft(pc *config.ParsedConfig, version string) (map[string]any, error) {
+	profile, err := Export(pc, version)
+	if err != nil {
+		return nil, err
+	}
+	profile.Endpoints = nonInputEndpoints(profile.Endpoints)
+	return map[string]any{
+		"schema":     SidecarProfileSchema,
+		"backend":    "mavlink-anywhere",
+		"kind":       Kind,
+		"created_at": time.Now().UTC().Format(time.RFC3339),
+		"profile":    profile,
+		"summary":    FleetSummary(&config.ParsedConfig{General: profile.General, Endpoints: profile.Endpoints}, "reference-draft", ""),
+	}, nil
+}
+
+func FleetHash(pc *config.ParsedConfig) string {
+	data, _ := json.Marshal(canonicalFleetPayload(pc))
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])[:12]
+}
+
+func FleetDiff(current *config.ParsedConfig, baseline Profile, mode string) (map[string]any, error) {
+	normalizedMode, err := NormalizePolicyMode(mode)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, fmt.Errorf("current config is required")
+	}
+	if err := validateFleetBaseline(baseline); err != nil {
+		return nil, err
+	}
+	target, err := MergeFleetPolicy(current, baseline, normalizedMode)
+	if err != nil {
+		return nil, err
+	}
+	changes := comparePolicyEndpoints(current, target)
+	baselinePolicy := nonInputEndpoints(baseline.Endpoints)
+	driftState := "outdated"
+	switch {
+	case normalizedMode == "observe" || normalizedMode == "local":
+		driftState = "unmanaged"
+	case len(baselinePolicy) == 0 && len(nonInputEndpoints(current.Endpoints)) > 0:
+		driftState = "missing_fleet_baseline"
+	case len(baselinePolicy) == 0:
+		driftState = "unmanaged"
+	case len(changes.Added) == 0 && len(changes.Updated) == 0 && len(changes.Removed) == 0:
+		driftState = "in_sync"
+	case normalizedMode == "fleet-merge" && len(changes.Removed) > 0 && len(changes.Added) == 0 && len(changes.Updated) == 0:
+		driftState = "local_extra"
+	}
+	strictPrune := []string{}
+	preserveLocal := []string{}
+	if normalizedMode == "fleet-strict" {
+		strictPrune = append(strictPrune, changes.Removed...)
+	}
+	if normalizedMode == "fleet-merge" {
+		preserveLocal = append(preserveLocal, changes.Removed...)
+	}
+	return map[string]any{
+		"schema":        SidecarProfileSchema,
+		"backend":       "mavlink-anywhere",
+		"mode":          normalizedMode,
+		"drift_state":   driftState,
+		"local_hash":    FleetHash(current),
+		"baseline_hash": profilePolicyHash(baseline),
+		"overlay_hash":  overlayHash(current),
+		"changes": map[string]any{
+			"add_from_baseline":    changes.Added,
+			"update_from_baseline": changes.Updated,
+			"local_extra":          changes.Removed,
+			"strict_prune":         strictPrune,
+			"preserve_local":       preserveLocal,
+		},
+		"warnings": fleetWarnings(normalizedMode, changes),
+	}, nil
+}
+
+func MergeFleetPolicy(current *config.ParsedConfig, baseline Profile, mode string) (*config.ParsedConfig, error) {
+	normalizedMode, err := NormalizePolicyMode(mode)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, fmt.Errorf("current config is required")
+	}
+	if normalizedMode == "observe" || normalizedMode == "local" {
+		return cloneParsedConfig(current), nil
+	}
+	if err := validateFleetBaseline(baseline); err != nil {
+		return nil, err
+	}
+	target := &config.ParsedConfig{
+		General:   baseline.General,
+		Endpoints: []endpoints.Endpoint{},
+	}
+	target.Endpoints = append(target.Endpoints, cloneEndpoints(inputEndpoints(current.Endpoints))...)
+	baselineByName := map[string]endpoints.Endpoint{}
+	for _, ep := range nonInputEndpoints(baseline.Endpoints) {
+		baselineByName[ep.Name] = ep
+		target.Endpoints = append(target.Endpoints, ep)
+	}
+	if normalizedMode == "fleet-merge" {
+		for _, ep := range nonInputEndpoints(current.Endpoints) {
+			if _, exists := baselineByName[ep.Name]; !exists {
+				target.Endpoints = append(target.Endpoints, ep)
+			}
+		}
+	}
+	return target, nil
+}
+
+func DryRunFleetPlan(current *config.ParsedConfig, baseline Profile, mode string, includeCandidate bool) (map[string]any, error) {
+	normalizedMode, err := NormalizePolicyMode(mode)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateFleetBaseline(baseline); err != nil {
+		return nil, err
+	}
+	candidate, err := MergeFleetPolicy(current, baseline, normalizedMode)
+	if err != nil {
+		return nil, err
+	}
+	diff, err := FleetDiff(current, baseline, normalizedMode)
+	if err != nil {
+		return nil, err
+	}
+	seed := map[string]any{
+		"mode":      normalizedMode,
+		"local":     FleetHash(current),
+		"baseline":  profilePolicyHash(baseline),
+		"candidate": FleetHash(candidate),
+		"created":   time.Now().Unix(),
+	}
+	rawSeed, _ := json.Marshal(seed)
+	sum := sha256.Sum256(rawSeed)
+	token := hex.EncodeToString(sum[:])[:16]
+	plan := map[string]any{
+		"schema":                         SidecarProfileSchema,
+		"backend":                        "mavlink-anywhere",
+		"kind":                           "mavlink-anywhere-profile-plan",
+		"dry_run_id":                     "mla-" + token[:12],
+		"created_at":                     time.Now().UTC().Format(time.RFC3339),
+		"mode":                           normalizedMode,
+		"confirmation_token":             token,
+		"requires_confirmation":          normalizedMode != "observe" && normalizedMode != "local",
+		"requires_advanced_confirmation": normalizedMode == "fleet-strict",
+		"diff":                           diff,
+		"candidate_hash":                 FleetHash(candidate),
+		"candidate_summary":              FleetSummary(candidate, "candidate", ""),
+	}
+	if includeCandidate {
+		plan["candidate_config"] = candidate
+	}
+	return plan, nil
+}
+
+func ApplyFleetPlan(configPath, envPath string, plan map[string]any, confirm string) (BackupInfo, *config.ParsedConfig, error) {
+	expected, _ := plan["confirmation_token"].(string)
+	if expected == "" || confirm != expected {
+		return BackupInfo{}, nil, fmt.Errorf("confirmation token does not match dry-run plan")
+	}
+	mode, _ := plan["mode"].(string)
+	if mode == "observe" || mode == "local" {
+		return BackupInfo{}, nil, fmt.Errorf("%s mode does not produce apply mutations", mode)
+	}
+	candidate, ok := plan["candidate_config"].(*config.ParsedConfig)
+	if !ok {
+		return BackupInfo{}, nil, fmt.Errorf("dry-run plan missing candidate config")
+	}
+	backup, err := CreateBackup(configPath, envPath)
+	if err != nil {
+		return BackupInfo{}, nil, err
+	}
+	if err := config.WriteConfigAndEnv(configPath, envPath, candidate); err != nil {
+		return BackupInfo{}, nil, err
+	}
+	return backup, candidate, nil
 }
 
 func buildTargetConfig(current *config.ParsedConfig, profile Profile, mode string) (*config.ParsedConfig, error) {
@@ -552,4 +794,177 @@ func copyFile(src, dst string) error {
 
 func isLoopback(addr string) bool {
 	return addr == "127.0.0.1" || addr == "localhost"
+}
+
+func cloneParsedConfig(src *config.ParsedConfig) *config.ParsedConfig {
+	if src == nil {
+		return nil
+	}
+	return &config.ParsedConfig{
+		General:    src.General,
+		Endpoints:  cloneEndpoints(src.Endpoints),
+		Raw:        src.Raw,
+		ModifiedAt: src.ModifiedAt,
+	}
+}
+
+func inputEndpoints(items []endpoints.Endpoint) []endpoints.Endpoint {
+	result := []endpoints.Endpoint{}
+	for _, ep := range items {
+		if isInputEndpoint(ep) {
+			result = append(result, ep)
+		}
+	}
+	return result
+}
+
+func nonInputEndpoints(items []endpoints.Endpoint) []endpoints.Endpoint {
+	result := []endpoints.Endpoint{}
+	for _, ep := range items {
+		if !isInputEndpoint(ep) {
+			result = append(result, ep)
+		}
+	}
+	return result
+}
+
+func sanitizedEndpoints(items []endpoints.Endpoint) []map[string]any {
+	result := make([]map[string]any, 0, len(items))
+	for _, ep := range items {
+		result = append(result, map[string]any{
+			"name":     ep.Name,
+			"type":     ep.Type,
+			"mode":     strings.ToLower(ep.Mode),
+			"address":  ep.Address,
+			"port":     ep.Port,
+			"device":   ep.Device,
+			"baud":     ep.Baud,
+			"category": ep.Category,
+			"enabled":  ep.Enabled,
+		})
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		left, _ := result[i]["name"].(string)
+		right, _ := result[j]["name"].(string)
+		return strings.ToLower(left) < strings.ToLower(right)
+	})
+	return result
+}
+
+func canonicalFleetPayload(pc *config.ParsedConfig) map[string]any {
+	if pc == nil {
+		return map[string]any{"general": config.GeneralSection{}, "endpoints": []map[string]any{}}
+	}
+	return map[string]any{
+		"general":   pc.General,
+		"endpoints": sanitizedEndpoints(nonInputEndpoints(pc.Endpoints)),
+	}
+}
+
+func overlayHash(pc *config.ParsedConfig) string {
+	payload := map[string]any{"hardware_source": sanitizedEndpoints(inputEndpoints(pc.Endpoints))}
+	data, _ := json.Marshal(payload)
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])[:12]
+}
+
+func profilePolicyHash(profile Profile) string {
+	pc := &config.ParsedConfig{General: profile.General, Endpoints: nonInputEndpoints(profile.Endpoints)}
+	return FleetHash(pc)
+}
+
+func FleetBaselineHash(profile Profile) string {
+	return profilePolicyHash(profile)
+}
+
+func FleetBaselineEndpointCount(profile Profile) int {
+	return len(nonInputEndpoints(profile.Endpoints))
+}
+
+func ValidateFleetBaseline(profile Profile) error {
+	return validateFleetBaseline(profile)
+}
+
+func validateFleetBaseline(profile Profile) error {
+	if strings.TrimSpace(profile.Kind) != "" && strings.TrimSpace(profile.Kind) != Kind {
+		return fmt.Errorf("unsupported profile kind: %q", profile.Kind)
+	}
+	seen := map[string]struct{}{}
+	validated := []endpoints.Endpoint{}
+	for _, ep := range nonInputEndpoints(profile.Endpoints) {
+		if err := validateEndpoint(ep); err != nil {
+			return err
+		}
+		if _, ok := seen[ep.Name]; ok {
+			return fmt.Errorf("duplicate endpoint name in profile: %q", ep.Name)
+		}
+		seen[ep.Name] = struct{}{}
+		if err := config.ValidateEndpointTopology(validated, ep, ""); err != nil {
+			return err
+		}
+		validated = append(validated, ep)
+	}
+	return nil
+}
+
+func comparePolicyEndpoints(current, target *config.ParsedConfig) ChangeSet {
+	changes := ChangeSet{
+		Added:     []string{},
+		Updated:   []string{},
+		Removed:   []string{},
+		Preserved: []string{},
+	}
+	if current == nil || target == nil {
+		return changes
+	}
+	if current.General != target.General {
+		changes.GeneralChanged = true
+	}
+	currentByName := map[string]endpoints.Endpoint{}
+	targetByName := map[string]endpoints.Endpoint{}
+	for _, ep := range nonInputEndpoints(current.Endpoints) {
+		currentByName[ep.Name] = ep
+	}
+	for _, ep := range nonInputEndpoints(target.Endpoints) {
+		targetByName[ep.Name] = ep
+	}
+	for name, currentEP := range currentByName {
+		targetEP, ok := targetByName[name]
+		if !ok {
+			changes.Removed = append(changes.Removed, name)
+			continue
+		}
+		if endpointsEqual(currentEP, targetEP) {
+			changes.Preserved = append(changes.Preserved, name)
+		} else {
+			changes.Updated = append(changes.Updated, name)
+		}
+	}
+	for name := range targetByName {
+		if _, ok := currentByName[name]; !ok {
+			changes.Added = append(changes.Added, name)
+		}
+	}
+	sort.Strings(changes.Added)
+	sort.Strings(changes.Updated)
+	sort.Strings(changes.Removed)
+	sort.Strings(changes.Preserved)
+	return changes
+}
+
+func fleetWarnings(mode string, changes ChangeSet) []string {
+	warnings := []string{}
+	if mode == "observe" {
+		warnings = append(warnings, "observe mode reports only and will not apply routing changes")
+	}
+	if mode == "local" {
+		warnings = append(warnings, "local mode keeps the node-local routing profile authoritative")
+	}
+	if mode == "fleet-merge" && len(changes.Removed) > 0 {
+		warnings = append(warnings, "fleet-merge preserves node-local endpoints not present in the fleet baseline")
+	}
+	if mode == "fleet-strict" && len(changes.Removed) > 0 {
+		warnings = append(warnings, "fleet-strict removes non-baseline output endpoints but preserves the hardware input overlay")
+	}
+	return warnings
 }

@@ -138,7 +138,7 @@ func TestApplyMergePreservesUnnamedEndpoints(t *testing.T) {
 				Name:     "gcs_vpn",
 				Type:     "UdpEndpoint",
 				Mode:     "normal",
-				Address:  "100.82.10.10",
+				Address:  "198.51.100.10",
 				Port:     24550,
 				Category: "gcs",
 				Enabled:  true,
@@ -158,6 +158,190 @@ func TestApplyMergePreservesUnnamedEndpoints(t *testing.T) {
 	}
 	if len(preview.Changes.Preserved) != 2 {
 		t.Fatalf("expected two preserved endpoints, got %+v", preview.Changes)
+	}
+}
+
+func TestFleetMergePreservesHardwareInputOverlay(t *testing.T) {
+	current := sampleCurrentConfig()
+	baseline := Profile{
+		SchemaVersion: SchemaVersion,
+		Kind:          Kind,
+		Metadata:      Metadata{ProfileName: "fleet-policy", ExportedAt: "2026-05-11T00:00:00Z", ExportedBy: "test"},
+		General:       current.General,
+		Endpoints: []endpoints.Endpoint{
+			{
+				Name:     "gcs_vpn",
+				Type:     "UdpEndpoint",
+				Mode:     "normal",
+				Address:  "100.64.0.10",
+				Port:     24550,
+				Category: "gcs",
+				Enabled:  true,
+			},
+		},
+	}
+
+	target, err := MergeFleetPolicy(current, baseline, "fleet-merge")
+	if err != nil {
+		t.Fatalf("MergeFleetPolicy failed: %v", err)
+	}
+	input, ok := findInput(target.Endpoints)
+	if !ok {
+		t.Fatalf("expected hardware input overlay to be preserved")
+	}
+	if input.Device != "/dev/ttyS0" || input.Baud != 57600 {
+		t.Fatalf("input overlay changed: %+v", input)
+	}
+	if len(nonInputEndpoints(target.Endpoints)) <= len(nonInputEndpoints(baseline.Endpoints)) {
+		t.Fatalf("expected fleet-merge to preserve local output endpoints")
+	}
+}
+
+func TestFleetStrictPreservesInputButPrunesLocalOutputs(t *testing.T) {
+	current := sampleCurrentConfig()
+	baseline := Profile{
+		SchemaVersion: SchemaVersion,
+		Kind:          Kind,
+		Metadata:      Metadata{ProfileName: "fleet-policy", ExportedAt: "2026-05-11T00:00:00Z", ExportedBy: "test"},
+		General:       current.General,
+		Endpoints: []endpoints.Endpoint{
+			{
+				Name:     "gcs_vpn",
+				Type:     "UdpEndpoint",
+				Mode:     "normal",
+				Address:  "100.64.0.10",
+				Port:     24550,
+				Category: "gcs",
+				Enabled:  true,
+			},
+		},
+	}
+
+	target, err := MergeFleetPolicy(current, baseline, "fleet-strict")
+	if err != nil {
+		t.Fatalf("MergeFleetPolicy failed: %v", err)
+	}
+	if _, ok := findInput(target.Endpoints); !ok {
+		t.Fatalf("expected hardware input overlay to be preserved")
+	}
+	outputs := nonInputEndpoints(target.Endpoints)
+	if len(outputs) != 1 || outputs[0].Name != "gcs_vpn" {
+		t.Fatalf("expected only fleet baseline output endpoint, got %+v", outputs)
+	}
+}
+
+func TestFleetDiffReportsOutdatedWhenBaselineUpdatesAndLocalExtras(t *testing.T) {
+	current := sampleCurrentConfig()
+	baseline := Profile{
+		SchemaVersion: SchemaVersion,
+		Kind:          Kind,
+		Metadata:      Metadata{ProfileName: "fleet-policy", ExportedAt: "2026-05-11T00:00:00Z", ExportedBy: "test"},
+		General:       config.GeneralSection{TcpServerPort: 5770, ReportStats: true},
+		Endpoints: []endpoints.Endpoint{
+			{
+				Name:     "mavsdk",
+				Type:     "UdpEndpoint",
+				Mode:     "normal",
+				Address:  "127.0.0.1",
+				Port:     14541,
+				Category: "local",
+				Enabled:  true,
+			},
+		},
+	}
+
+	diff, err := FleetDiff(current, baseline, "fleet-merge")
+	if err != nil {
+		t.Fatalf("FleetDiff failed: %v", err)
+	}
+	if diff["drift_state"] != "outdated" {
+		t.Fatalf("expected outdated drift, got %#v", diff["drift_state"])
+	}
+}
+
+func TestFleetDryRunPlanUsesConfirmationToken(t *testing.T) {
+	current := sampleCurrentConfig()
+	baseline := Profile{
+		SchemaVersion: SchemaVersion,
+		Kind:          Kind,
+		Metadata:      Metadata{ProfileName: "fleet-policy", ExportedAt: "2026-05-11T00:00:00Z", ExportedBy: "test"},
+		General:       current.General,
+		Endpoints: []endpoints.Endpoint{
+			{
+				Name:     "gcs_vpn",
+				Type:     "UdpEndpoint",
+				Mode:     "normal",
+				Address:  "100.64.0.10",
+				Port:     24550,
+				Category: "gcs",
+				Enabled:  true,
+			},
+		},
+	}
+
+	plan, err := DryRunFleetPlan(current, baseline, "fleet-merge", true)
+	if err != nil {
+		t.Fatalf("DryRunFleetPlan failed: %v", err)
+	}
+	if plan["confirmation_token"] == "" {
+		t.Fatalf("expected confirmation token: %#v", plan)
+	}
+	if _, ok := plan["candidate_config"].(*config.ParsedConfig); !ok {
+		t.Fatalf("expected candidate config in internal plan")
+	}
+}
+
+func TestFleetBaselineValidationDoesNotRequireHardwareInput(t *testing.T) {
+	baseline := Profile{
+		SchemaVersion: SchemaVersion,
+		Kind:          Kind,
+		General:       sampleCurrentConfig().General,
+		Endpoints: []endpoints.Endpoint{
+			{
+				Name:     "gcs_vpn",
+				Type:     "UdpEndpoint",
+				Mode:     "normal",
+				Address:  "100.64.0.10",
+				Port:     24550,
+				Category: "gcs",
+				Enabled:  true,
+			},
+		},
+	}
+
+	if err := ValidateFleetBaseline(baseline); err != nil {
+		t.Fatalf("fleet baseline without input should validate: %v", err)
+	}
+	if FleetBaselineEndpointCount(baseline) != 1 {
+		t.Fatalf("expected one fleet endpoint")
+	}
+}
+
+func TestFleetDryRunRejectsInvalidBaselineInObserveMode(t *testing.T) {
+	baseline := Profile{
+		SchemaVersion: SchemaVersion,
+		Kind:          Kind,
+		General:       sampleCurrentConfig().General,
+		Endpoints: []endpoints.Endpoint{
+			{Name: "bad", Type: "UdpEndpoint", Mode: "normal", Address: "999.999.999.999", Port: 24550, Enabled: true},
+		},
+	}
+
+	if _, err := DryRunFleetPlan(sampleCurrentConfig(), baseline, "observe", false); err == nil {
+		t.Fatalf("expected invalid baseline to be rejected even in observe mode")
+	}
+}
+
+func TestFleetApplyRejectsObserveAndLocalModes(t *testing.T) {
+	current := sampleCurrentConfig()
+	baseline := Profile{SchemaVersion: SchemaVersion, Kind: Kind, General: current.General}
+	plan, err := DryRunFleetPlan(current, baseline, "local", true)
+	if err != nil {
+		t.Fatalf("DryRunFleetPlan failed: %v", err)
+	}
+	token, _ := plan["confirmation_token"].(string)
+	if _, _, err := ApplyFleetPlan("main.conf", "env", plan, token); err == nil {
+		t.Fatalf("expected local mode apply to be rejected")
 	}
 }
 

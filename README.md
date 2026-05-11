@@ -61,7 +61,7 @@ http://127.0.0.1:9070
 Manage endpoints, inspect MAVLink health, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
 To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
 
-The dashboard can also export the current effective routing profile, preview imported profiles, apply them with automatic backup, and restore the last good dashboard-managed backup.
+The dashboard can also export the current effective routing profile, preview imported profiles, apply them with automatic backup, and restore the last good dashboard-managed backup. Fleet profile APIs support MDS Fleet Ops dry-run/apply workflows while preserving node-local hardware input settings by default.
 
 ## ✅ That's It!
 
@@ -212,6 +212,24 @@ Use dashboard profiles when you want repeatable routing layouts without editing 
 - **Restore Last Good** reverts to the latest dashboard-created backup
 
 Profiles are intentionally limited to router configuration. They do not change firewall policy or host boot serial settings.
+
+For fleet-managed deployments, use the dashboard profile API rather than
+editing `/etc/mavlink-router/main.conf` directly:
+
+- `GET /api/v1/profiles/summary` reports endpoint policy and the local hardware
+  source overlay separately.
+- `POST /api/v1/profiles/import` requires `dry_run=true` and returns a
+  confirmation token.
+- `POST /api/v1/profiles/apply` applies only a confirmed dry-run plan for
+  `fleet-merge` or `fleet-strict`.
+- `fleet-merge` preserves local extra endpoints and the hardware input overlay.
+- `fleet-strict` can prune local extra output endpoints only after advanced
+  confirmation and still preserves the hardware input overlay.
+
+Set `MAVLINK_ANYWHERE_API_TOKEN` before exposing mutating dashboard APIs beyond
+loopback. Read-only API responses can still reveal routing topology and system
+metadata, so keep network exposure behind VPN/firewall controls. MDS Fleet Ops
+sends the matching bearer token through `MDS_SIDECAR_PROFILE_TOKEN`.
 
 ---
 

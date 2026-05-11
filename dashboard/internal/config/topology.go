@@ -43,10 +43,30 @@ func ValidateEndpointTopology(existing []endpoints.Endpoint, candidate endpoints
 		if otherAddr == "" {
 			otherAddr = "0.0.0.0"
 		}
-		if otherAddr == addr && ep.Port == candidate.Port {
+		if bindAddressesConflict(otherAddr, addr) && ep.Port == candidate.Port {
 			return fmt.Errorf("server-mode endpoint %q already binds %s:%d", ep.Name, addr, candidate.Port)
 		}
 	}
 
 	return nil
+}
+
+func bindAddressesConflict(existing, candidate string) bool {
+	existing = normalizeBindAddress(existing)
+	candidate = normalizeBindAddress(candidate)
+	if existing == candidate {
+		return true
+	}
+	return existing == "0.0.0.0" || candidate == "0.0.0.0" || existing == "::" || candidate == "::"
+}
+
+func normalizeBindAddress(addr string) string {
+	addr = strings.ToLower(strings.TrimSpace(addr))
+	if addr == "" {
+		return "0.0.0.0"
+	}
+	if addr == "localhost" {
+		return "127.0.0.1"
+	}
+	return addr
 }

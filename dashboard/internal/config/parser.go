@@ -215,10 +215,44 @@ func WriteConfigFile(path string, pc *ParsedConfig) error {
 
 // WriteConfigAndEnv writes the config file and regenerates the companion env file.
 func WriteConfigAndEnv(configPath, envPath string, pc *ParsedConfig) error {
+	oldConfig, hadConfig, err := readOptionalFile(configPath)
+	if err != nil {
+		return err
+	}
+	oldEnv, hadEnv, err := readOptionalFile(envPath)
+	if err != nil {
+		return err
+	}
 	if err := WriteConfigFile(configPath, pc); err != nil {
 		return err
 	}
-	return WriteEnvFile(envPath, EnvFromConfig(pc))
+	if err := WriteEnvFile(envPath, EnvFromConfig(pc)); err != nil {
+		_ = restoreOptionalFile(configPath, oldConfig, hadConfig)
+		_ = restoreOptionalFile(envPath, oldEnv, hadEnv)
+		return err
+	}
+	return nil
+}
+
+func readOptionalFile(path string) ([]byte, bool, error) {
+	raw, err := os.ReadFile(path)
+	if err == nil {
+		return raw, true, nil
+	}
+	if os.IsNotExist(err) {
+		return nil, false, nil
+	}
+	return nil, false, err
+}
+
+func restoreOptionalFile(path string, raw []byte, existed bool) error {
+	if existed {
+		return os.WriteFile(path, raw, 0644)
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // WriteRawConfig validates and writes raw config text, then regenerates the env file.

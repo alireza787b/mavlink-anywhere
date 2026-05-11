@@ -243,6 +243,47 @@ mavlink-anywhere logs -f
 
 ---
 
+### Fleet Profile Automation
+
+Fleet profile reconciliation is exposed through the dashboard API rather than a
+shell subcommand. This keeps node hardware-source settings local while allowing
+MDS Fleet Ops to manage shared endpoint policy.
+
+Supported API-backed workflow:
+
+```bash
+# Local summary: endpoint policy and hardware input overlay are separate.
+curl -s http://127.0.0.1:9070/api/v1/profiles/summary
+
+# Stage a dry-run plan. Baseline JSON contains shared non-input endpoints.
+curl -s -X POST http://127.0.0.1:9070/api/v1/profiles/import \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"fleet-merge","dry_run":true,"baseline":{"kind":"mavlink-anywhere-profile","endpoints":[]}}'
+
+# Apply requires the dry_run_id and confirmation token from the dry-run result.
+curl -s -X POST http://127.0.0.1:9070/api/v1/profiles/apply \
+  -H 'Content-Type: application/json' \
+  -d '{"dry_run_id":"mla-example","confirmation":{"acknowledged_risks":true,"confirmation_token":"dry-run-token"}}'
+```
+
+Modes:
+
+| Mode | Behavior |
+|------|----------|
+| `observe` | Validate and report only; apply is rejected |
+| `local` | Node-local dashboard/API remains authoritative; apply is rejected |
+| `fleet-merge` | Apply named baseline endpoints while preserving local extra endpoints and hardware input |
+| `fleet-strict` | Apply baseline endpoints and prune local extra outputs only after advanced confirmation |
+
+Remote mutating API calls require `MAVLINK_ANYWHERE_API_TOKEN`. Loopback calls
+remain usable for standalone maintenance when the token is unset.
+
+There is no separate `mavlink-anywhere profile ...` shell subcommand in this
+release. The dashboard API above is the supported automation surface for MDS
+Fleet Ops and compatible orchestrators.
+
+---
+
 ### uninstall
 
 Remove mavlink-router service configuration.
