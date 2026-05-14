@@ -1,22 +1,36 @@
 # MAVLink Anywhere
 
-**Stream MAVLink telemetry from your drone to anywhere in the world.**
+**Portable MAVLink routing for drones, companion computers, GCS links, LTE, Wi-Fi, VPNs, UDP, and serial.**
 
-Route MAVLink data from your flight controller (Pixhawk/ArduPilot/PX4) through a companion computer to ground stations, SDKs, and remote locations.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MAVLink](https://img.shields.io/badge/MAVLink-routing-20D6FF.svg)](https://mavlink.io/)
+[![Dashboard](https://img.shields.io/badge/dashboard-9070-F4B942.svg)](docs/DASHBOARD.md)
+
+MAVLink Anywhere routes MAVLink data from a flight controller
+(Pixhawk/ArduPilot/PX4) through a companion computer to ground stations, SDKs,
+remote operators, local QGroundControl fallback links, and MDS Fleet Ops.
+
+## Ecosystem Fit
+
+| Tool | Role |
+|------|------|
+| **MAVLink Anywhere** | companion-computer MAVLink routing and endpoint dashboard |
+| **[MDS](https://github.com/alireza787b/mavsdk_drone_show)** | fleet operations, SITL, real drone dashboard, sidecar profile status |
+| **[Smart Wi-Fi Manager](https://github.com/alireza787b/smart-wifi-manager)** | Wi-Fi profile priority and field connectivity |
 
 ---
 
-## 📺 Video Tutorial
+## Video Tutorial
 
 **First time here? Watch the video!**
 
 [![MAVLink Anywhere Tutorial](https://img.youtube.com/vi/_QEWpoy6HSo/0.jpg)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
 
-🎬 [Complete Setup Guide (YouTube)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
+[Complete Setup Guide (YouTube)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Step 1: Clone & Install
 
@@ -61,9 +75,12 @@ http://127.0.0.1:9070
 Manage endpoints, inspect MAVLink health, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
 To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
 
+Do not expose the dashboard to a public network without VPN, firewall, reverse
+proxy, or future sidecar auth hardening.
+
 The dashboard can also export the current effective routing profile, preview imported profiles, apply them with automatic backup, and restore the last good dashboard-managed backup. Fleet profile APIs support MDS Fleet Ops dry-run/apply workflows while preserving node-local hardware input settings by default.
 
-## ✅ That's It!
+## That's It
 
 The configure script handles everything - platform detection, serial setup, configuration, and dashboard.
 
@@ -71,7 +88,7 @@ The configure script handles everything - platform detection, serial setup, conf
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 | Guide | Description |
 |-------|-------------|
@@ -82,7 +99,7 @@ The configure script handles everything - platform detection, serial setup, conf
 
 ---
 
-## 🔧 Advanced Usage
+## Advanced Usage
 
 ### Auto Mode (Minimal Prompts)
 
@@ -116,7 +133,7 @@ sudo ./configure_mavlink_router.sh --headless \
 
 ---
 
-## 🛠️ Common Commands
+## Common Commands
 
 ### Service Management
 
