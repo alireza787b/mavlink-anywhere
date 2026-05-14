@@ -17,10 +17,12 @@ field networks, and ground-control workflows.
 - Caddy/reverse-proxy guidance for trusted multi-dashboard deployments
 - clearer profile import/export workflows for shared fleet endpoints while
   preserving node-local serial and hardware overlays
+- richer MDS Fleet Ops route-profile examples for large fleets
 
 ## Later
 
 - stronger audit logs for route changes
 - richer multi-link health scoring
 - advanced integration examples for LTE, Wi-Fi, VPN, and local fallback paths
-
+- optional agent/MCP-friendly telemetry and route-health workflows for fleet
+  automation

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">MAVLink Anywhere social preview</title>
+  <desc id="desc">GitHub social preview for MAVLink Anywhere.</desc>
+  <rect width="1280" height="640" fill="#09111c"/>
+  <g transform="translate(110 155)">
+    <rect width="180" height="180" rx="42" fill="#f8fbff"/>
+    <circle cx="54" cy="90" r="13" fill="#09111c"/>
+    <circle cx="132" cy="52" r="13" fill="#0b84ff"/>
+    <circle cx="132" cy="128" r="13" fill="#d58a00"/>
+    <path d="M66 84c26-18 38-24 57-30" fill="none" stroke="#09111c" stroke-width="10" stroke-linecap="round"/>
+    <path d="M66 96c26 18 38 24 57 30" fill="none" stroke="#09111c" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <text x="340" y="232" fill="#f8fbff" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="900" letter-spacing="-3">MAVLink Anywhere</text>
+  <text x="346" y="310" fill="#20d6ff" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="800" letter-spacing="5">PORTABLE TELEMETRY ROUTING</text>
+  <text x="346" y="378" fill="#d8e1ea" font-family="Arial, Helvetica, sans-serif" font-size="28">MAVLink links for companion computers, GCS, LTE, Wi-Fi, VPN, UDP, and serial.</text>
+</svg>

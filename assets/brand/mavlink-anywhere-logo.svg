@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 120" role="img" aria-labelledby="title desc">
+  <title id="title">MAVLink Anywhere</title>
+  <desc id="desc">MAVLink Anywhere wordmark with minimal split relay mark.</desc>
+  <rect width="120" height="120" rx="28" fill="#09111c"/>
+  <circle cx="36" cy="60" r="9" fill="#f8fbff"/>
+  <circle cx="88" cy="35" r="9" fill="#20d6ff"/>
+  <circle cx="88" cy="85" r="9" fill="#f4b942"/>
+  <path d="M44 56c17-12 25-16 37-20" fill="none" stroke="#f8fbff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M44 64c17 12 25 16 37 20" fill="none" stroke="#f8fbff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M100 35 84 27v16z" fill="#f8fbff"/>
+  <path d="M100 85 84 77v16z" fill="#f8fbff"/>
+  <text x="148" y="60" fill="#09111c" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="900" letter-spacing="-2">MAVLink Anywhere</text>
+  <text x="150" y="92" fill="#536173" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="4">PORTABLE TELEMETRY ROUTING</text>
+</svg>
