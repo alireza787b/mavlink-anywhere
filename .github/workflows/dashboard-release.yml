@@ -19,7 +19,7 @@ jobs:
           cache: false
 
       - name: Build and smoke-test dashboard assets
-        run: ./scripts/build_release_assets.sh build
+        run: ./scripts/build_release_assets.sh "$PWD/build"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
