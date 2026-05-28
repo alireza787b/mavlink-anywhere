@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.13
+# Version: 3.0.14
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -117,7 +117,9 @@ SKIP_DASHBOARD=false
 INSTALL_DASHBOARD_ONLY=false
 DASHBOARD_LISTEN=""
 DASHBOARD_AUTH_USER=""
+DASHBOARD_AUTH_PASSWORD=""
 DASHBOARD_AUTH_PASSWORD_FILE=""
+DASHBOARD_AUTH_PASSWORD_STDIN=false
 DASHBOARD_AUTH_HASH=""
 DASHBOARD_GENERATE_PASSWORD=false
 DASHBOARD_AUTH_PROMPT=false
@@ -127,10 +129,11 @@ DASHBOARD_API_TOKEN=""
 DASHBOARD_API_TOKEN_FILE=""
 DASHBOARD_GENERATE_API_TOKEN=false
 DASHBOARD_DISABLE_API_TOKEN=false
+DASHBOARD_UFW_RULE=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.13
+MAVLink-Anywhere Configuration Script v3.0.14
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -158,8 +161,13 @@ Dashboard:
   --dashboard-listen   Dashboard listen address (default: 127.0.0.1:9070)
   --dashboard-auth-user USER
                       Browser login username for remote dashboard auth
+  --dashboard-auth-password PASSWORD
+                      Read dashboard login password from this argument.
+                      Not recommended: shell history/process listings can expose it.
   --dashboard-auth-password-file PATH
                       Read dashboard login password from a root-readable file
+  --dashboard-auth-password-stdin
+                      Read dashboard login password from stdin for headless installs
   --dashboard-auth-hash HASH
                       Use an existing bcrypt password hash for dashboard login
   --dashboard-auth-prompt
@@ -180,6 +188,8 @@ Dashboard:
                       Generate a machine API bearer token and print it once
   --dashboard-disable-api-token
                       Remove the machine API bearer token from dashboard env
+  --dashboard-ufw-rule, --ufw-rule
+                      If UFW is active and dashboard is remote, allow the dashboard TCP port
 
 Other:
   --skip-serial-check  Skip serial port prerequisite check
@@ -277,9 +287,17 @@ while [[ $# -gt 0 ]]; do
             DASHBOARD_AUTH_USER="$2"
             shift 2
             ;;
+        --dashboard-auth-password)
+            DASHBOARD_AUTH_PASSWORD="$2"
+            shift 2
+            ;;
         --dashboard-auth-password-file)
             DASHBOARD_AUTH_PASSWORD_FILE="$2"
             shift 2
+            ;;
+        --dashboard-auth-password-stdin)
+            DASHBOARD_AUTH_PASSWORD_STDIN=true
+            shift
             ;;
         --dashboard-auth-hash)
             DASHBOARD_AUTH_HASH="$2"
@@ -315,6 +333,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dashboard-disable-api-token)
             DASHBOARD_DISABLE_API_TOKEN=true
+            shift
+            ;;
+        --dashboard-ufw-rule|--ufw-rule)
+            DASHBOARD_UFW_RULE=true
             shift
             ;;
         --debug)

@@ -28,7 +28,9 @@ the surrounding network is trusted.
 - Set or rotate the browser password with `sudo ./configure_mavlink_router.sh
   --install-dashboard --dashboard-auth-user USER --dashboard-auth-prompt`.
 - Headless installs should use `--dashboard-auth-password-file PATH` with a
-  root-readable file, not a command-line password.
+  root-readable file or `--dashboard-auth-password-stdin`, not a command-line
+  password. `--dashboard-auth-password PASSWORD` is available only as a
+  non-recommended lab/automation escape hatch.
 - If an operator is locked out, SSH to the node, rerun the configure script with
   a new password, or use `--dashboard-disable-auth` only on an isolated trusted
   network.

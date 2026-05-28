@@ -171,6 +171,27 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
   --dashboard-auth-prompt
 ```
 
+Headless password options:
+
+```bash
+printf '%s' "$MAVLINK_DASHBOARD_PASSWORD" | sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-auth-user operator \
+  --dashboard-auth-password-stdin
+```
+
+`--dashboard-auth-password PASSWORD` is available for constrained lab
+automation, but it is not recommended because command-line arguments can leak
+through shell history and process listings.
+
+Firewall:
+
+- The configure script changes UFW only when `--dashboard-ufw-rule` or
+  `--ufw-rule` is supplied.
+- If UFW is active and the dashboard is remote, the flag allows the dashboard
+  TCP port.
+- Without the flag, run `sudo ufw allow 9070/tcp` yourself.
+
 Configure a machine API token without putting it in shell history:
 
 ```bash

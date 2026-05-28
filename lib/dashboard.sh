@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Dashboard Management
 # =============================================================================
-# Version: 3.0.13
+# Version: 3.0.14
 # Description: Install, configure, and manage the web dashboard binary
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -108,10 +108,10 @@ PY
 
 hash_dashboard_password() {
     local password="$1"
-    if ! "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}" --help 2>&1 | grep -q -- '--hash-password'; then
-        ma_log_warn "Installed dashboard binary does not support password hashing; rebuilding from local source." >&2
+    if ! dashboard_binary_can_hash "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"; then
+        ma_log_warn "Installed dashboard binary cannot hash passwords on this host; rebuilding from local source." >&2
         build_dashboard_binary_from_source >&2 || {
-            ma_log_error "Cannot configure dashboard auth because the dashboard binary cannot hash passwords."
+            ma_log_error "Cannot configure dashboard auth because the dashboard binary cannot hash passwords on this host."
             return 1
         }
     fi
@@ -125,6 +125,14 @@ read_secret_file() {
         return 1
     fi
     tr -d '\r\n' < "$file_path"
+}
+
+read_secret_stdin() {
+    if [[ -t 0 ]]; then
+        ma_log_error "--dashboard-auth-password-stdin expects the password on stdin. Use --dashboard-auth-prompt for interactive setup."
+        return 1
+    fi
+    tr -d '\r\n'
 }
 
 prompt_dashboard_password() {
@@ -146,6 +154,52 @@ prompt_dashboard_password() {
         return 1
     fi
     printf '%s' "$password"
+}
+
+dashboard_binary_can_hash() {
+    local binary_path="$1"
+    local output
+    [[ -x "$binary_path" ]] || return 1
+    output="$(printf '%s' 'mavlink-anywhere-smoke-password' | "$binary_path" --hash-password 2>/dev/null || true)"
+    [[ "$output" =~ ^\$2[aby]\$ ]]
+}
+
+dashboard_listen_port() {
+    local listen_addr="$1"
+    local port="${listen_addr##*:}"
+    port="${port%\]}"
+    if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+        ma_log_error "Could not determine dashboard port from listen address: $listen_addr"
+        return 1
+    fi
+    printf '%s' "$port"
+}
+
+maybe_configure_dashboard_ufw() {
+    local listen_addr="${1:-127.0.0.1:${DASHBOARD_PORT}}"
+    local port
+    if [[ "${DASHBOARD_UFW_RULE:-false}" != "true" ]]; then
+        return 0
+    fi
+    if dashboard_is_local_only "$listen_addr"; then
+        ma_log_info "Skipping UFW dashboard rule because the dashboard listens on loopback only."
+        return 0
+    fi
+    if ! ma_command_exists ufw; then
+        ma_log_warn "--dashboard-ufw-rule requested but ufw is not installed."
+        return 0
+    fi
+    if ! ufw status 2>/dev/null | grep -qi '^Status: active'; then
+        ma_log_info "UFW is not active; no dashboard firewall rule was added."
+        return 0
+    fi
+    port="$(dashboard_listen_port "$listen_addr")" || return 1
+    if ufw allow "${port}/tcp" >/dev/null; then
+        ma_log_success "UFW allows MAVLink Anywhere dashboard TCP ${port}"
+        return 0
+    fi
+    ma_log_error "Failed to add UFW rule for dashboard TCP ${port}"
+    return 1
 }
 
 write_dashboard_env_file() {
@@ -224,7 +278,9 @@ configure_dashboard_auth() {
 
     if [[ "${DASHBOARD_OPEN_LAB_MODE:-false}" == "true" ]] && {
         [[ -n "${DASHBOARD_AUTH_USER:-}" ]] ||
+            [[ -n "${DASHBOARD_AUTH_PASSWORD:-}" ]] ||
             [[ -n "${DASHBOARD_AUTH_PASSWORD_FILE:-}" ]] ||
+            [[ "${DASHBOARD_AUTH_PASSWORD_STDIN:-false}" == "true" ]] ||
             [[ -n "${DASHBOARD_AUTH_HASH:-}" ]] ||
             [[ "${DASHBOARD_GENERATE_PASSWORD:-false}" == "true" ]] ||
             [[ "${DASHBOARD_AUTH_PROMPT:-false}" == "true" ]] ||
@@ -283,6 +339,15 @@ configure_dashboard_auth() {
         auth_hash="$(hash_dashboard_password "$password")" || return 1
     fi
 
+    if [[ -z "$auth_hash" && "${DASHBOARD_AUTH_PASSWORD_STDIN:-false}" == "true" ]]; then
+        password="$(read_secret_stdin)" || return 1
+        if [[ -z "$password" ]]; then
+            ma_log_error "Dashboard password from stdin is empty."
+            return 1
+        fi
+        auth_hash="$(hash_dashboard_password "$password")" || return 1
+    fi
+
     if [[ -z "$auth_hash" && -n "${DASHBOARD_AUTH_PASSWORD_FILE:-}" ]]; then
         if [[ ! -r "$DASHBOARD_AUTH_PASSWORD_FILE" ]]; then
             ma_log_error "Dashboard password file is not readable: $DASHBOARD_AUTH_PASSWORD_FILE"
@@ -291,6 +356,16 @@ configure_dashboard_auth() {
         password="$(read_secret_file "$DASHBOARD_AUTH_PASSWORD_FILE")" || return 1
         if [[ -z "$password" ]]; then
             ma_log_error "Dashboard password file is empty."
+            return 1
+        fi
+        auth_hash="$(hash_dashboard_password "$password")" || return 1
+    fi
+
+    if [[ -z "$auth_hash" && -n "${DASHBOARD_AUTH_PASSWORD:-}" ]]; then
+        ma_log_warn "--dashboard-auth-password exposes secrets through shell history/process listings. Prefer --dashboard-auth-password-file, --dashboard-auth-password-stdin, or --dashboard-auth-prompt."
+        password="$DASHBOARD_AUTH_PASSWORD"
+        if [[ -z "$password" ]]; then
+            ma_log_error "Dashboard password argument is empty."
             return 1
         fi
         auth_hash="$(hash_dashboard_password "$password")" || return 1
@@ -363,9 +438,14 @@ install_dashboard_binary() {
     if curl -fsSL --connect-timeout 15 --max-time 120 -o "$tmp_file" "$download_url" 2>/dev/null; then
         # Verify it's a real binary (not an HTML error page)
         if dashboard_binary_looks_valid "$tmp_file"; then
+            chmod +x "$tmp_file"
+            if ! dashboard_binary_can_hash "$tmp_file"; then
+                ma_log_warn "Downloaded dashboard asset cannot hash passwords on this host"
+                rm -f "$tmp_file"
+                return 1
+            fi
             ma_ensure_dir "$DASHBOARD_INSTALL_DIR"
             mv "$tmp_file" "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
-            chmod +x "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
             ma_log_success "Dashboard binary installed: ${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
             return 0
         else
@@ -412,9 +492,15 @@ build_dashboard_binary_from_source() {
             go build -ldflags "-s -w -X main.Version=${version} -X main.BuildTime=${build_time}" \
             -o "$tmp_bin" ./cmd/
     ); then
+        chmod +x "$tmp_bin"
+        if ! dashboard_binary_can_hash "$tmp_bin"; then
+            rm -f "$tmp_bin"
+            rm -rf "$cache_dir"
+            ma_log_warn "Local dashboard source build completed but password hashing failed"
+            return 1
+        fi
         ma_ensure_dir "$DASHBOARD_INSTALL_DIR"
         mv "$tmp_bin" "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
-        chmod +x "${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
         rm -rf "$cache_dir"
         ma_log_success "Dashboard binary built from source: ${DASHBOARD_INSTALL_DIR}/${DASHBOARD_BINARY_NAME}"
         return 0
@@ -543,7 +629,10 @@ install_dashboard() {
     elif ! dashboard_binary_is_current; then
         ma_log_info "Updating dashboard binary: $(get_dashboard_version) -> v${MAVLINK_ANYWHERE_VERSION}"
         if ! install_dashboard_binary "v${MAVLINK_ANYWHERE_VERSION}"; then
-            ma_log_warn "Dashboard binary update failed — keeping existing version"
+            ma_log_warn "Dashboard binary update download failed — trying local source build"
+            if ! build_dashboard_binary_from_source; then
+                ma_log_warn "Dashboard binary update failed — keeping existing version"
+            fi
         fi
     else
         ma_log_info "Dashboard binary already installed: $(get_dashboard_version)"
@@ -551,6 +640,7 @@ install_dashboard() {
 
     # Setup service
     setup_dashboard_service "$listen_addr"
+    maybe_configure_dashboard_ufw "$listen_addr"
 
     echo ""
     if dashboard_is_local_only "$listen_addr"; then

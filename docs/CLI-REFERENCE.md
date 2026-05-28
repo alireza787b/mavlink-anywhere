@@ -74,7 +74,9 @@ Dashboard options:
 | `--install-dashboard` | Install/update dashboard only | unset |
 | `--dashboard-listen HOST:PORT` | Dashboard listen address | `127.0.0.1:9070` |
 | `--dashboard-auth-user USER` | Browser login username | `admin` when generated |
+| `--dashboard-auth-password PASSWORD` | Read browser login password from this argument; not recommended | unset |
 | `--dashboard-auth-password-file PATH` | Read browser login password from a root-readable file | unset |
+| `--dashboard-auth-password-stdin` | Read browser login password from stdin | unset |
 | `--dashboard-auth-hash HASH` | Use an existing bcrypt browser password hash | unset |
 | `--dashboard-auth-prompt` | Prompt twice for browser login password | unset |
 | `--dashboard-generate-password` | Generate browser login password and print once | unset |
@@ -84,6 +86,7 @@ Dashboard options:
 | `--dashboard-api-token-file PATH` | Read machine API bearer token from a root-readable file | unset |
 | `--dashboard-generate-api-token` | Generate machine API bearer token and print once | unset |
 | `--dashboard-disable-api-token` | Remove machine API bearer token from dashboard env | unset |
+| `--dashboard-ufw-rule`, `--ufw-rule` | If UFW is active and dashboard is remote, allow the dashboard TCP port | unset |
 
 Examples:
 
@@ -111,6 +114,8 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
 Dashboard install behavior:
 
 - downloads the matching release binary (`arm6`, `arm64`, `amd64`) when available
+- smoke-tests the release asset's password-hash path on the target host before
+  using it for dashboard auth
 - falls back to a local Go build if Go is installed
 - continues with router-only setup if the dashboard is unavailable
 - generates browser Basic Auth automatically when remote exposure is requested
@@ -118,6 +123,7 @@ Dashboard install behavior:
 - preserves existing browser auth and machine API token values in
   `/etc/mavlink-anywhere/dashboard.env` unless explicitly replaced or removed
 - blocks `--dashboard-open-lab-mode` from downgrading an already protected env
+- opens UFW only when explicitly requested with `--dashboard-ufw-rule`
 
 ## `mavlink-router-cli.sh`
 

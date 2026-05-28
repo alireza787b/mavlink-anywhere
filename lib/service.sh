@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Service Management
 # =============================================================================
-# Version: 3.0.13
+# Version: 3.0.14
 # Description: systemd service management for mavlink-router
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
