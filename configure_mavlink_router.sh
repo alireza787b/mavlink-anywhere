@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.12
+# Version: 3.0.13
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -20,7 +20,7 @@
 #        --endpoints "127.0.0.1:14540,192.168.1.100:24550"
 #
 # 3. Auto Mode:
-#    sudo ./configure_mavlink_router.sh --auto --gcs-ip 100.96.32.75
+#    sudo ./configure_mavlink_router.sh --auto --gcs-ip 192.0.2.50
 #
 # 4. UDP Input Mode (no serial required):
 #    sudo ./configure_mavlink_router.sh --headless \
@@ -130,7 +130,7 @@ DASHBOARD_DISABLE_API_TOKEN=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.12
+MAVLink-Anywhere Configuration Script v3.0.13
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -191,12 +191,12 @@ Examples:
   sudo ./configure_mavlink_router.sh
 
   # Auto-detect with GCS IP
-  sudo ./configure_mavlink_router.sh --auto --gcs-ip 100.96.32.75
+  sudo ./configure_mavlink_router.sh --auto --gcs-ip 192.0.2.50
 
   # Headless with UART
   sudo ./configure_mavlink_router.sh --headless \\
       --uart /dev/ttyS0 --baud 57600 \\
-      --endpoints "127.0.0.1:14540,127.0.0.1:14569,100.96.32.75:24550"
+      --endpoints "127.0.0.1:14540,127.0.0.1:14569,192.0.2.50:24550"
 
   # USB serial adapter (no boot config needed)
   sudo ./configure_mavlink_router.sh --auto --uart /dev/ttyUSB0

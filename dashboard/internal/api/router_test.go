@@ -15,7 +15,7 @@ const validFleetBaselineJSON = `{
     "kind": "mavlink-anywhere-profile",
     "general": {"tcpServerPort": 5760, "reportStats": false},
     "endpoints": [
-      {"name":"gcs_vpn","type":"UdpEndpoint","mode":"normal","address":"100.64.0.10","port":24550,"category":"gcs","enabled":true}
+      {"name":"gcs_vpn","type":"UdpEndpoint","mode":"normal","address":"192.0.2.10","port":24550,"category":"gcs","enabled":true}
     ]
   }
 }`

@@ -57,7 +57,7 @@ var Registry = []EndpointTemplate{
 		Label:       "GCS over VPN",
 		Category:    "gcs",
 		Mode:        "normal",
-		DefaultAddr: "100.96.0.1",
+		DefaultAddr: "192.0.2.50",
 		DefaultPort: 24550,
 		Description: "Remote GCS over VPN (Tailscale/ZeroTier)",
 		InfoText:    "Push telemetry to a remote ground station over VPN tunnel.",
