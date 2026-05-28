@@ -1,5 +1,48 @@
 #!/bin/bash
 
+FORCE_REINSTALL=false
+SKIP_SWAP=false
+
+show_help() {
+    cat <<'EOF'
+MavlinkAnywhere mavlink-router installer
+
+Usage: sudo ./install_mavlink_router.sh [OPTIONS]
+
+Options:
+  --skip-swap       Do not create or resize swap while compiling mavlink-router
+  --force, -f       Rebuild/reinstall even when mavlink-routerd is already present
+  --help, -h        Show this help and exit without making changes
+
+Notes:
+  This script installs upstream mavlink-router from source. It may run apt,
+  clone a build tree under the current user's home directory, compile with
+  Meson/Ninja, and stop/restart service components during installation.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --skip-swap)
+            SKIP_SWAP=true
+            shift
+            ;;
+        --force|-f)
+            FORCE_REINSTALL=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
 echo "================================================================="
 echo "MavlinkAnywhere: Mavlink-router Installation Script"
 echo "Author: Alireza Ghaderi"
@@ -31,6 +74,11 @@ fi
 
 # Function to increase swap space
 increase_swap() {
+    if [ "$SKIP_SWAP" = "true" ]; then
+        print_progress "Skipping swap space management (--skip-swap)"
+        return 0
+    fi
+
     print_progress "Increasing swap space..."
 
     if [ "$SWAP_METHOD" = "dphys" ]; then
@@ -63,6 +111,10 @@ increase_swap() {
 
 # Function to clean up swap space
 cleanup_swap() {
+    if [ "$SKIP_SWAP" = "true" ]; then
+        return 0
+    fi
+
     print_progress "Resetting swap space to original size..."
 
     if [ "$SWAP_METHOD" = "dphys" ]; then
@@ -88,18 +140,18 @@ cleanup_swap() {
     fi
 }
 
-# Stop any existing mavlink-router service
-print_progress "Stopping any existing mavlink-router service..."
-sudo systemctl stop mavlink-router
-
 # Navigate to home directory
 cd ~
 
 # Check if mavlink-router is already installed
-if command -v mavlink-routerd &> /dev/null; then
+if command -v mavlink-routerd &> /dev/null && [ "$FORCE_REINSTALL" != "true" ]; then
     print_progress "mavlink-router is already installed. You're good to go!"
     exit 0
 fi
+
+# Stop any existing mavlink-router service
+print_progress "Stopping any existing mavlink-router service..."
+sudo systemctl stop mavlink-router 2>/dev/null || true
 
 # If the mavlink-router directory exists, remove it
 if [ -d "mavlink-router" ]; then

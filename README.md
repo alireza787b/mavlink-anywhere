@@ -5,7 +5,7 @@
 ![MAVLink Anywhere logo](assets/brand/mavlink-anywhere-logo.svg)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.0.11-blue.svg)](configure_mavlink_router.sh)
+[![Version](https://img.shields.io/badge/version-3.0.12-blue.svg)](configure_mavlink_router.sh)
 [![MAVLink](https://img.shields.io/badge/MAVLink-routing-20D6FF.svg)](https://mavlink.io/)
 [![Dashboard](https://img.shields.io/badge/dashboard-9070-F4B942.svg)](docs/DASHBOARD.md)
 
@@ -89,6 +89,14 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
   --dashboard-auth-user operator \
   --dashboard-auth-password-file /root/mavlink-dashboard-password
 ```
+
+For interactive setup or password rotation, use `--dashboard-auth-prompt`.
+For MDS/Fleet Ops or other machine clients, also configure a bearer token with
+`--dashboard-generate-api-token` or `--dashboard-api-token-file`.
+
+An unauthenticated remote dashboard is still available for isolated lab demos:
+use `--dashboard-open-lab-mode`. Do not use that mode on a shared LAN, VPN, or
+field network.
 
 Do not expose the dashboard to a public network without VPN, firewall, reverse
 proxy, and dashboard browser auth.

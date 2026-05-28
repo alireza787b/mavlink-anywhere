@@ -1,270 +1,178 @@
-# MAVLink-Anywhere CLI Reference
+# MAVLink Anywhere CLI Reference
 
-Complete reference for the mavlink-anywhere command-line interface.
+MAVLink Anywhere uses shell entry points plus a standalone dashboard binary. It
+does not ship a unified `mavlink-anywhere <command>` operator CLI in this
+release.
 
-## Overview
+Main entry points:
 
-The `mavlink-anywhere` CLI provides a unified interface for installing, configuring, and managing mavlink-router.
+- `install_mavlink_router.sh` installs upstream `mavlink-routerd` from source.
+- `configure_mavlink_router.sh` configures routing, systemd, and the optional dashboard.
+- `mavlink-router-cli.sh` provides small local service helpers.
+- `/opt/mavlink-anywhere/mavlink-anywhere` is the Go dashboard server binary,
+  not the fleet/operator command wrapper.
 
-```bash
-mavlink-anywhere <command> [options]
-```
-
-## Commands
-
-### install
-
-Install mavlink-router from source.
+## `install_mavlink_router.sh`
 
 ```bash
-sudo mavlink-anywhere install [OPTIONS]
+sudo ./install_mavlink_router.sh [OPTIONS]
 ```
 
-**Options:**
+Installs upstream `mavlink-router` from source. It may run `apt`, clone a build
+tree under the current user's home directory, compile with Meson/Ninja, and stop
+service components during installation.
+
+Options:
+
 | Option | Description |
 |--------|-------------|
-| `--skip-swap` | Skip swap space management during compilation |
-| `--force, -f` | Force reinstallation even if already installed |
-| `-h, --help` | Show help |
+| `--skip-swap` | Do not create or resize swap while compiling |
+| `--force`, `-f` | Rebuild/reinstall even when `mavlink-routerd` already exists |
+| `--help`, `-h` | Show help and exit without side effects |
 
-**Examples:**
-```bash
-# Standard installation
-sudo mavlink-anywhere install
-
-# Force reinstall
-sudo mavlink-anywhere install --force
-
-# Skip swap management (if you have enough RAM)
-sudo mavlink-anywhere install --skip-swap
-```
-
-**Notes:**
-- Requires root privileges
-- Compilation may take 5-15 minutes depending on hardware
-- Automatically manages swap space during compilation
-- Safe to run multiple times (idempotent)
-
----
-
-### configure
-
-Configure mavlink-router with UART, UDP endpoints, and service setup.
+Examples:
 
 ```bash
-sudo mavlink-anywhere configure [OPTIONS]
+sudo ./install_mavlink_router.sh
+sudo ./install_mavlink_router.sh --force
+sudo ./install_mavlink_router.sh --skip-swap
 ```
 
-This command is an alias for `./configure_mavlink_router.sh`.
+## `configure_mavlink_router.sh`
 
-**Modes:**
+```bash
+sudo ./configure_mavlink_router.sh [OPTIONS]
+```
+
+Modes:
 
 | Mode | Description |
 |------|-------------|
-| (default) | Interactive mode with prompts |
+| default | Interactive mode with prompts |
 | `--auto` | Auto-detect settings, minimal prompts |
-| `--headless` | No prompts, all settings via CLI |
+| `--headless` | No prompts; all settings via CLI |
 
-**Options:**
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--uart DEVICE` | UART device path | Auto-detected |
-| `--baud RATE` | Baud rate | 57600 |
-| `--endpoints LIST` | Comma-separated endpoints | - |
-| `--gcs-ip IP` | GCS IP address (adds :24550) | - |
-| `--input-type TYPE` | Input type: `uart` or `udp` | uart |
-| `--input-address ADDR` | UDP listen address | 0.0.0.0 |
-| `--input-port PORT` | UDP listen port | 14550 |
-| `--skip-dashboard` | Skip web dashboard installation | - |
-| `--install-dashboard` | Install/update dashboard only | - |
-| `--dashboard-listen HOST:PORT` | Dashboard listen address | 127.0.0.1:9070 |
-| `--skip-serial-check` | Skip serial port prerequisite check | - |
-| `--debug` | Enable debug output | - |
-
-**Examples:**
-
-```bash
-# Interactive mode (original behavior)
-sudo mavlink-anywhere configure
-
-# Auto mode with GCS IP
-sudo mavlink-anywhere configure --auto --gcs-ip 192.168.1.100
-
-# Headless with full control
-sudo mavlink-anywhere configure --headless \
-    --uart /dev/ttyS0 \
-    --baud 57600 \
-    --endpoints "127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550"
-
-# UDP input for SITL
-sudo mavlink-anywhere configure --headless \
-    --input-type udp \
-    --input-port 14550 \
-    --endpoints "127.0.0.1:14540"
-
-# Expose the dashboard on the network
-sudo mavlink-anywhere configure --install-dashboard \
-    --dashboard-listen 0.0.0.0:9070
-```
-
-**Dashboard install behavior:**
-- Preferred path: download the matching release binary (`arm6`, `arm64`, `amd64`)
-- Fallback path: build the dashboard locally from source if `go` is installed
-- Final fallback: continue with router-only setup if the dashboard is unavailable
-
----
-
-### status
-
-Show current mavlink-router status and configuration.
-
-```bash
-mavlink-anywhere status
-```
-
-**Output includes:**
-- Binary installation status
-- Service status (running/stopped/enabled)
-- Serial port configuration status
-- Current configuration summary
-
-**Example output:**
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  MAVLink Router Service Status                                                │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ Binary:      ✓ Installed (mavlink-router 2)                                   │
-│ Service:     ✓ Configured                                                     │
-│ Status:      ● Running                                                        │
-│ Since:       2024-01-15 10:30:00                                              │
-│ Config:      ✓ /etc/mavlink-router/main.conf                                  │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### test
-
-Test serial/UART connection for MAVLink data.
-
-```bash
-mavlink-anywhere test [OPTIONS]
-```
-
-**Options:**
+Routing options:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--uart, --device DEVICE` | UART device to test | Auto-detected |
-| `--baud RATE` | Baud rate | 57600 |
+| `--uart DEVICE` | UART device path | auto-detected |
+| `--baud RATE` | UART baud rate | `57600` |
+| `--endpoints LIST` | Comma-separated UDP endpoints | standard local endpoints |
+| `--gcs-ip IP` | Add GCS endpoint on port `24550` | unset |
+| `--input-type TYPE` | `uart` or `udp` | `uart` |
+| `--input-address ADDR` | UDP input bind address | `0.0.0.0` |
+| `--input-port PORT` | UDP input port | `14550` |
+| `--skip-serial-check` | Skip serial port prerequisite check | unset |
+| `--debug` | Enable debug output | unset |
 
-**Examples:**
-```bash
-# Test auto-detected device
-mavlink-anywhere test
-
-# Test specific device
-mavlink-anywhere test --uart /dev/ttyAMA0
-
-# Test with specific baud rate
-mavlink-anywhere test --uart /dev/ttyS0 --baud 115200
-```
-
-**Output:**
-- Device accessibility check
-- Permission verification
-- Data reception test (5 second timeout)
-- MAVLink data detection
-
----
-
-### start
-
-Start the mavlink-router service.
-
-```bash
-sudo mavlink-anywhere start
-```
-
-**Notes:**
-- Requires root privileges
-- Service must be configured first
-- Verifies service started successfully
-
----
-
-### stop
-
-Stop the mavlink-router service.
-
-```bash
-sudo mavlink-anywhere stop
-```
-
----
-
-### restart
-
-Restart the mavlink-router service.
-
-```bash
-sudo mavlink-anywhere restart
-```
-
----
-
-### logs
-
-Show mavlink-router service logs.
-
-```bash
-mavlink-anywhere logs [OPTIONS]
-```
-
-**Options:**
+Dashboard options:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-f, --follow` | Follow log output in real-time | - |
-| `-n, --lines N` | Show last N lines | 50 |
+| `--skip-dashboard` | Skip dashboard installation | unset |
+| `--install-dashboard` | Install/update dashboard only | unset |
+| `--dashboard-listen HOST:PORT` | Dashboard listen address | `127.0.0.1:9070` |
+| `--dashboard-auth-user USER` | Browser login username | `admin` when generated |
+| `--dashboard-auth-password-file PATH` | Read browser login password from a root-readable file | unset |
+| `--dashboard-auth-hash HASH` | Use an existing bcrypt browser password hash | unset |
+| `--dashboard-auth-prompt` | Prompt twice for browser login password | unset |
+| `--dashboard-generate-password` | Generate browser login password and print once | unset |
+| `--dashboard-disable-auth` | Remove browser login config; use only on trusted isolated networks | unset |
+| `--dashboard-open-lab-mode` | No browser login and no API token for remote dashboard mutations | unset |
+| `--dashboard-api-token TOKEN` | Configure machine API bearer token; prefer file/generate options | unset |
+| `--dashboard-api-token-file PATH` | Read machine API bearer token from a root-readable file | unset |
+| `--dashboard-generate-api-token` | Generate machine API bearer token and print once | unset |
+| `--dashboard-disable-api-token` | Remove machine API bearer token from dashboard env | unset |
 
-**Examples:**
+Examples:
+
 ```bash
-# Show recent logs
-mavlink-anywhere logs
+sudo ./configure_mavlink_router.sh
 
-# Show last 100 lines
-mavlink-anywhere logs -n 100
+sudo ./configure_mavlink_router.sh --auto --gcs-ip 192.168.1.100
 
-# Follow logs in real-time
-mavlink-anywhere logs -f
+sudo ./configure_mavlink_router.sh --headless \
+  --uart /dev/ttyS0 \
+  --baud 57600 \
+  --endpoints "127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550"
+
+sudo ./configure_mavlink_router.sh --headless \
+  --input-type udp \
+  --input-port 14550 \
+  --endpoints "127.0.0.1:14540"
+
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-auth-user operator \
+  --dashboard-auth-prompt
 ```
 
----
+Dashboard install behavior:
 
-### Fleet Profile Automation
+- downloads the matching release binary (`arm6`, `arm64`, `amd64`) when available
+- falls back to a local Go build if Go is installed
+- continues with router-only setup if the dashboard is unavailable
+- generates browser Basic Auth automatically when remote exposure is requested
+  and no dashboard auth exists
+- preserves existing browser auth and machine API token values in
+  `/etc/mavlink-anywhere/dashboard.env` unless explicitly replaced or removed
+- blocks `--dashboard-open-lab-mode` from downgrading an already protected env
+
+## `mavlink-router-cli.sh`
+
+```bash
+./mavlink-router-cli.sh [command]
+```
+
+Commands:
+
+| Command | Description |
+|---------|-------------|
+| `status` | Show systemd status and current config |
+| `logs`, `log` | Follow live `mavlink-router` logs |
+| `restart` | Restart `mavlink-router` |
+| `stop` | Stop `mavlink-router` |
+| `start` | Start `mavlink-router` |
+| `config`, `show` | Show `/etc/mavlink-router/main.conf` and env file |
+| `edit` | Edit the config file and optionally restart |
+| `endpoints`, `ep` | Quick edit UDP endpoints |
+| `reconfigure`, `reconfig` | Run `configure_mavlink_router.sh` again |
+| `help`, `--help`, `-h` | Show helper help |
+
+Examples:
+
+```bash
+./mavlink-router-cli.sh status
+./mavlink-router-cli.sh logs
+sudo ./mavlink-router-cli.sh restart
+sudo ./mavlink-router-cli.sh reconfigure
+```
+
+## Fleet Profile Automation
 
 Fleet profile reconciliation is exposed through the dashboard API rather than a
 shell subcommand. This keeps node hardware-source settings local while allowing
 MDS Fleet Ops to manage shared endpoint policy.
 
-Supported API-backed workflow:
+Loopback example:
 
 ```bash
-# Local summary: endpoint policy and hardware input overlay are separate.
 curl -s http://127.0.0.1:9070/api/v1/profiles/summary
 
-# Stage a dry-run plan. Baseline JSON contains shared non-input endpoints.
 curl -s -X POST http://127.0.0.1:9070/api/v1/profiles/import \
   -H 'Content-Type: application/json' \
-  -d '{"mode":"fleet-merge","dry_run":true,"baseline":{"kind":"mavlink-anywhere-profile","endpoints":[]}}'
+  -d '{"mode":"fleet-merge","dry_run":true,"baseline":{"kind":"mavlink-anywhere-profile","schemaVersion":"1","endpoints":[]}}'
 
-# Apply requires the dry_run_id and confirmation token from the dry-run result.
 curl -s -X POST http://127.0.0.1:9070/api/v1/profiles/apply \
   -H 'Content-Type: application/json' \
   -d '{"dry_run_id":"mla-example","confirmation":{"acknowledged_risks":true,"confirmation_token":"dry-run-token"}}'
 ```
+
+Remote machine clients use `MAVLINK_ANYWHERE_API_TOKEN` with
+`Authorization: Bearer ...` or `X-Mavlink-Anywhere-Token`. Remote browser
+mutations use dashboard Basic Auth and the bundled dashboard JavaScript adds
+`X-Sidecar-CSRF`.
 
 Modes:
 
@@ -275,131 +183,46 @@ Modes:
 | `fleet-merge` | Apply named baseline endpoints while preserving local extra endpoints and hardware input |
 | `fleet-strict` | Apply baseline endpoints and prune local extra outputs only after advanced confirmation |
 
-Remote mutating API calls require `MAVLINK_ANYWHERE_API_TOKEN`. Loopback calls
-remain usable for standalone maintenance when the token is unset.
-
-There is no separate `mavlink-anywhere profile ...` shell subcommand in this
-release. The dashboard API above is the supported automation surface for MDS
-Fleet Ops and compatible orchestrators.
-
----
-
-### uninstall
-
-Remove mavlink-router service configuration.
-
-```bash
-sudo mavlink-anywhere uninstall [OPTIONS]
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--remove-config` | Also remove configuration files |
-
-**Examples:**
-```bash
-# Remove service only
-sudo mavlink-anywhere uninstall
-
-# Remove service and configuration
-sudo mavlink-anywhere uninstall --remove-config
-```
-
-**Notes:**
-- This removes the systemd service but not the mavlink-routerd binary
-- Configuration files at `/etc/mavlink-router/` are kept unless `--remove-config` is specified
-
----
-
-### help
-
-Show help message.
-
-```bash
-mavlink-anywhere help
-```
-
----
-
-### version
-
-Show version information.
-
-```bash
-mavlink-anywhere version
-```
-
----
-
 ## Endpoint Format
 
 Endpoints are specified as `IP:PORT` pairs, comma-separated:
 
-```
-"127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550"
+```text
+127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550
 ```
 
-### Standard Default Endpoints
+Standard endpoints:
 
 | Port | Service | Mode | Description |
 |------|---------|------|-------------|
-| 14550 | gcs_listen | Server | Default GCS listen port (any GCS can connect) |
-| 14540 | MAVSDK | Normal | MAVSDK SDK connection |
-| 14569 | mavlink2rest | Normal | Web-based REST API |
-| 12550 | Local | Normal | Local monitoring/debugging |
-| 24550 | GCS (VPN) | Normal | Remote ground station over VPN |
-| 5760 | TCP server | TCP | Dynamic multi-client TCP access and dashboard MAVLink probe |
+| `14550` | `gcs_listen` | UDP server | Default ad-hoc GCS listener |
+| `14540` | MAVSDK | UDP normal | Local MAVSDK connection |
+| `14569` | mavlink2rest | UDP normal | Local REST bridge |
+| `12550` | Local | UDP normal | Local monitoring/debugging |
+| `24550` | GCS VPN | UDP normal | Remote ground station over VPN |
+| `5760` | TCP server | TCP | Dynamic multi-client TCP access and dashboard probe |
 
 Notes:
-- `gcs_listen` on `14550/udp` is ad-hoc server access and is not a replacement for explicit local outputs
-- An explicit outbound UDP endpoint to `remote-ip:14550` can coexist with local `gcs_listen`
-- Avoid feeding the same remote GCS from both paths at the same time
 
-### Named Shortcuts (in config files)
-
-The following shortcuts are supported:
-- `mavsdk` → 127.0.0.1:14540
-- `mavlink2rest` → 127.0.0.1:14569
-- `local` → 127.0.0.1:12550
-
----
+- `gcs_listen` on `14550/udp` is ad-hoc server access and is not a replacement
+  for explicit local outputs.
+- An explicit outbound UDP endpoint to `remote-ip:14550` can coexist with local
+  `gcs_listen`.
+- Avoid feeding the same remote GCS from both paths at the same time.
 
 ## Configuration Files
 
 | File | Description |
 |------|-------------|
 | `/etc/mavlink-router/main.conf` | Main mavlink-router configuration |
-| `/etc/default/mavlink-router` | Environment variables |
-| `/etc/systemd/system/mavlink-router.service` | Systemd service file |
-| `/etc/systemd/system/mavlink-anywhere-dashboard.service` | Dashboard service file |
-
----
-
-## Exit Codes
-
-| Code | Description |
-|------|-------------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Permission denied (need sudo) |
-| 3 | Configuration error |
-| 4 | Service error |
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `MA_DEBUG` | Enable debug output (`true`/`false`) |
-
----
+| `/etc/default/mavlink-router` | Router environment variables |
+| `/etc/mavlink-anywhere/dashboard.env` | Dashboard browser auth/API token env |
+| `/etc/systemd/system/mavlink-router.service` | Router systemd service |
+| `/etc/systemd/system/mavlink-anywhere-dashboard.service` | Dashboard systemd service |
 
 ## See Also
 
-- [DASHBOARD.md](DASHBOARD.md) - Web dashboard setup and API reference
-- [UART-SETUP.md](UART-SETUP.md) - Raspberry Pi serial configuration
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
-- [Main README](../README.md) - Project overview
+- [DASHBOARD.md](DASHBOARD.md)
+- [UART-SETUP.md](UART-SETUP.md)
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- [Main README](../README.md)

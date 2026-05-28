@@ -148,10 +148,14 @@ function dashboard() {
 
         // API calls
         async api(method, path, body) {
+            const normalizedMethod = String(method || 'GET').toUpperCase();
             const opts = {
-                method,
+                method: normalizedMethod,
                 headers: { 'Content-Type': 'application/json' },
             };
+            if (!['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod)) {
+                opts.headers['X-Sidecar-CSRF'] = '1';
+            }
             if (body) opts.body = JSON.stringify(body);
             const res = await fetch('/api/v1' + path, opts);
             const data = await res.json();

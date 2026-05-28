@@ -136,6 +136,8 @@ sudo systemctl disable mavlink-anywhere-dashboard
 |--------|--------------|-----------|
 | `127.0.0.1:9070` (default) | None | Same trust level as SSH |
 | `0.0.0.0:9070` (explicit) | Browser Basic Auth for dashboard users; `MAVLINK_ANYWHERE_API_TOKEN` for machine mutations | Use only on a VPN/trusted admin network |
+| open lab mode | None | Isolated lab/demo networks only |
+| no dashboard | None | Terminal-only or hardened hosts |
 
 The dashboard binds to `127.0.0.1` by default; it is only accessible from the
 device itself or via SSH tunnel. Before exposing it on a network, configure
@@ -159,6 +161,60 @@ sudo ./configure_mavlink_router.sh --install-dashboard \
   --dashboard-auth-user operator \
   --dashboard-auth-password-file /root/mavlink-dashboard-password
 ```
+
+For interactive setup or password rotation, use:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-auth-user operator \
+  --dashboard-auth-prompt
+```
+
+Configure a machine API token without putting it in shell history:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-api-token-file /root/mavlink-api-token
+```
+
+Generate one and print it once:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-generate-api-token
+```
+
+Open lab mode intentionally disables browser login and bearer-token enforcement
+for remote mutations:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-open-lab-mode
+```
+
+Use open lab mode only on isolated local test networks. Runtime ignores the
+open-lab bypass if dashboard auth or `MAVLINK_ANYWHERE_API_TOKEN` is also
+configured.
+
+Debug API calls:
+
+```bash
+curl -u operator http://node.example:9070/api/v1/status
+curl -u operator -H 'X-Sidecar-CSRF: 1' \
+  -H 'Content-Type: application/json' \
+  -X POST http://node.example:9070/api/v1/service/restart
+curl -H "Authorization: Bearer $MAVLINK_ANYWHERE_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -X POST http://node.example:9070/api/v1/profiles/validate \
+  --data @fleet-mavlink.json
+```
+
+The MAVLink Anywhere dashboard is a Go static/API server, not FastAPI. The GCS
+FastAPI/OpenAPI docs are separate from this sidecar dashboard.
 
 ## GCS Server Endpoint (Port 14550)
 

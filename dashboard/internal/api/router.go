@@ -26,6 +26,9 @@ const (
 	mutationTokenEnv        = "MAVLINK_ANYWHERE_API_TOKEN"
 	dashboardAuthUserEnv    = "MAVLINK_ANYWHERE_DASHBOARD_USER"
 	dashboardAuthBcryptEnv  = "MAVLINK_ANYWHERE_DASHBOARD_PASSWORD_BCRYPT"
+	openMutationsEnv        = "MAVLINK_ANYWHERE_ALLOW_UNAUTHENTICATED_MUTATIONS"
+	dashboardCSRFHeader     = "X-Sidecar-CSRF"
+	corsAllowedOriginEnv    = "MAVLINK_ANYWHERE_CORS_ALLOWED_ORIGIN"
 	dashboardAuthBasicRealm = `Basic realm="MAVLink Anywhere", charset="UTF-8"`
 )
 
@@ -78,18 +81,45 @@ func (s *Server) Router() http.Handler {
 	return withCORS(withDashboardAuth(withMutationAuth(mux)))
 }
 
-// withCORS wraps a handler with CORS headers for development.
+// withCORS keeps same-origin production access closed while allowing explicit
+// development origins when MAVLINK_ANYWHERE_CORS_ALLOWED_ORIGIN is configured.
 func withCORS(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Mavlink-Anywhere-Token")
+		applyCORSHeaders(w, r)
 		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
+			if r.Header.Get("Origin") != "" && w.Header().Get("Access-Control-Allow-Origin") == "" {
+				writeError(w, http.StatusForbidden, "CORS origin not allowed")
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		h.ServeHTTP(w, r)
 	})
+}
+
+func applyCORSHeaders(w http.ResponseWriter, r *http.Request) {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return
+	}
+	allowed := strings.TrimSpace(os.Getenv(corsAllowedOriginEnv))
+	if allowed == "" {
+		return
+	}
+	for _, candidate := range strings.Split(allowed, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if candidate == origin || (candidate == "*" && isLoopbackRemote(r.RemoteAddr)) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Mavlink-Anywhere-Token, "+dashboardCSRFHeader)
+			return
+		}
+	}
 }
 
 func withMutationAuth(h http.Handler) http.Handler {
@@ -100,6 +130,10 @@ func withMutationAuth(h http.Handler) http.Handler {
 		}
 		if mutationAccessAllowed(r) {
 			h.ServeHTTP(w, r)
+			return
+		}
+		if dashboardBasicAuthAllowed(r) && !dashboardBrowserMutationAllowed(r) {
+			writeError(w, http.StatusForbidden, dashboardCSRFHeader+" is required for browser mutating requests")
 			return
 		}
 		if dashboardAuthConfigured() {
@@ -116,7 +150,15 @@ func withMutationAuth(h http.Handler) http.Handler {
 }
 
 func mutationAccessAllowed(r *http.Request) bool {
-	if isLoopbackRemote(r.RemoteAddr) || dashboardBasicAuthAllowed(r) {
+	if isLoopbackRemote(r.RemoteAddr) {
+		return true
+	}
+	if dashboardBasicAuthAllowed(r) {
+		return dashboardBrowserMutationAllowed(r)
+	}
+	if !dashboardAuthConfigured() &&
+		strings.TrimSpace(os.Getenv(mutationTokenEnv)) == "" &&
+		envFlagEnabled(openMutationsEnv) {
 		return true
 	}
 	expected := strings.TrimSpace(os.Getenv(mutationTokenEnv))
@@ -129,6 +171,18 @@ func mutationAccessAllowed(r *http.Request) bool {
 		supplied = strings.TrimSpace(auth[7:])
 	}
 	return supplied != "" && subtle.ConstantTimeCompare([]byte(supplied), []byte(expected)) == 1
+}
+
+func dashboardBrowserMutationAllowed(r *http.Request) bool {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+		return true
+	}
+	return strings.TrimSpace(r.Header.Get(dashboardCSRFHeader)) != ""
+}
+
+func envFlagEnabled(name string) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	return value == "1" || value == "true" || value == "yes" || value == "on"
 }
 
 func dashboardAuthConfigured() bool {

@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.11
+# Version: 3.0.12
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -120,11 +120,17 @@ DASHBOARD_AUTH_USER=""
 DASHBOARD_AUTH_PASSWORD_FILE=""
 DASHBOARD_AUTH_HASH=""
 DASHBOARD_GENERATE_PASSWORD=false
+DASHBOARD_AUTH_PROMPT=false
 DASHBOARD_DISABLE_AUTH=false
+DASHBOARD_OPEN_LAB_MODE=false
+DASHBOARD_API_TOKEN=""
+DASHBOARD_API_TOKEN_FILE=""
+DASHBOARD_GENERATE_API_TOKEN=false
+DASHBOARD_DISABLE_API_TOKEN=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.11
+MAVLink-Anywhere Configuration Script v3.0.12
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -156,10 +162,24 @@ Dashboard:
                       Read dashboard login password from a root-readable file
   --dashboard-auth-hash HASH
                       Use an existing bcrypt password hash for dashboard login
+  --dashboard-auth-prompt
+                      Prompt twice for a dashboard login password
   --dashboard-generate-password
                       Generate a dashboard password and print it once
   --dashboard-disable-auth
                       Do not configure browser auth even for a remote dashboard
+  --dashboard-open-lab-mode
+                      No browser login and no API token required for remote
+                      dashboard mutations. Use only on isolated lab networks.
+  --dashboard-api-token TOKEN
+                      Configure machine API bearer token. Prefer file/generate
+                      options to avoid shell history.
+  --dashboard-api-token-file PATH
+                      Read machine API bearer token from a root-readable file
+  --dashboard-generate-api-token
+                      Generate a machine API bearer token and print it once
+  --dashboard-disable-api-token
+                      Remove the machine API bearer token from dashboard env
 
 Other:
   --skip-serial-check  Skip serial port prerequisite check
@@ -189,6 +209,11 @@ Examples:
   # Expose dashboard on the network
   sudo ./configure_mavlink_router.sh --install-dashboard \\
       --dashboard-listen 0.0.0.0:9070
+
+  # Expose dashboard with operator browser login
+  sudo ./configure_mavlink_router.sh --install-dashboard \\
+      --dashboard-listen 0.0.0.0:9070 \\
+      --dashboard-auth-user admin --dashboard-auth-prompt
 
 Documentation: https://github.com/alireza787b/mavlink-anywhere
 EOF
@@ -260,12 +285,36 @@ while [[ $# -gt 0 ]]; do
             DASHBOARD_AUTH_HASH="$2"
             shift 2
             ;;
+        --dashboard-auth-prompt)
+            DASHBOARD_AUTH_PROMPT=true
+            shift
+            ;;
         --dashboard-generate-password)
             DASHBOARD_GENERATE_PASSWORD=true
             shift
             ;;
         --dashboard-disable-auth)
             DASHBOARD_DISABLE_AUTH=true
+            shift
+            ;;
+        --dashboard-open-lab-mode)
+            DASHBOARD_OPEN_LAB_MODE=true
+            shift
+            ;;
+        --dashboard-api-token)
+            DASHBOARD_API_TOKEN="$2"
+            shift 2
+            ;;
+        --dashboard-api-token-file)
+            DASHBOARD_API_TOKEN_FILE="$2"
+            shift 2
+            ;;
+        --dashboard-generate-api-token)
+            DASHBOARD_GENERATE_API_TOKEN=true
+            shift
+            ;;
+        --dashboard-disable-api-token)
+            DASHBOARD_DISABLE_API_TOKEN=true
             shift
             ;;
         --debug)
