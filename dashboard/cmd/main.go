@@ -3,13 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/alireza787b/mavlink-anywhere/dashboard/internal/api"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -22,10 +25,27 @@ func main() {
 	configPath := flag.String("config", "/etc/mavlink-router/main.conf", "Path to mavlink-router config file")
 	envPath := flag.String("env", "/etc/default/mavlink-router", "Path to mavlink-router env file")
 	version := flag.Bool("version", false, "Print version and exit")
+	hashPassword := flag.Bool("hash-password", false, "Read a password from stdin and print a bcrypt hash")
 	flag.Parse()
 
 	if *version {
 		fmt.Printf("mavlink-anywhere dashboard %s (built %s)\n", Version, BuildTime)
+		os.Exit(0)
+	}
+	if *hashPassword {
+		raw, err := io.ReadAll(io.LimitReader(os.Stdin, 4096))
+		if err != nil {
+			log.Fatalf("read password: %v", err)
+		}
+		password := strings.TrimRight(string(raw), "\r\n")
+		if password == "" {
+			log.Fatal("empty password")
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			log.Fatalf("hash password: %v", err)
+		}
+		fmt.Println(string(hash))
 		os.Exit(0)
 	}
 

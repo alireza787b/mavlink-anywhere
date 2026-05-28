@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.10
+# Version: 3.0.11
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -116,10 +116,15 @@ SKIP_SERIAL_CHECK=false
 SKIP_DASHBOARD=false
 INSTALL_DASHBOARD_ONLY=false
 DASHBOARD_LISTEN=""
+DASHBOARD_AUTH_USER=""
+DASHBOARD_AUTH_PASSWORD_FILE=""
+DASHBOARD_AUTH_HASH=""
+DASHBOARD_GENERATE_PASSWORD=false
+DASHBOARD_DISABLE_AUTH=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.10
+MAVLink-Anywhere Configuration Script v3.0.11
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
 
@@ -145,6 +150,16 @@ Dashboard:
   --skip-dashboard     Skip web dashboard installation
   --install-dashboard  Install/update dashboard only (no router reconfig)
   --dashboard-listen   Dashboard listen address (default: 127.0.0.1:9070)
+  --dashboard-auth-user USER
+                      Browser login username for remote dashboard auth
+  --dashboard-auth-password-file PATH
+                      Read dashboard login password from a root-readable file
+  --dashboard-auth-hash HASH
+                      Use an existing bcrypt password hash for dashboard login
+  --dashboard-generate-password
+                      Generate a dashboard password and print it once
+  --dashboard-disable-auth
+                      Do not configure browser auth even for a remote dashboard
 
 Other:
   --skip-serial-check  Skip serial port prerequisite check
@@ -232,6 +247,26 @@ while [[ $# -gt 0 ]]; do
         --dashboard-listen)
             DASHBOARD_LISTEN="$2"
             shift 2
+            ;;
+        --dashboard-auth-user)
+            DASHBOARD_AUTH_USER="$2"
+            shift 2
+            ;;
+        --dashboard-auth-password-file)
+            DASHBOARD_AUTH_PASSWORD_FILE="$2"
+            shift 2
+            ;;
+        --dashboard-auth-hash)
+            DASHBOARD_AUTH_HASH="$2"
+            shift 2
+            ;;
+        --dashboard-generate-password)
+            DASHBOARD_GENERATE_PASSWORD=true
+            shift
+            ;;
+        --dashboard-disable-auth)
+            DASHBOARD_DISABLE_AUTH=true
+            shift
             ;;
         --debug)
             MA_DEBUG=true

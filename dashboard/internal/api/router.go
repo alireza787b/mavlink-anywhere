@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/alireza787b/mavlink-anywhere/dashboard/web"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Server holds shared state for all API handlers.
@@ -21,7 +22,12 @@ type Server struct {
 	plans      map[string]map[string]any
 }
 
-const mutationTokenEnv = "MAVLINK_ANYWHERE_API_TOKEN"
+const (
+	mutationTokenEnv        = "MAVLINK_ANYWHERE_API_TOKEN"
+	dashboardAuthUserEnv    = "MAVLINK_ANYWHERE_DASHBOARD_USER"
+	dashboardAuthBcryptEnv  = "MAVLINK_ANYWHERE_DASHBOARD_PASSWORD_BCRYPT"
+	dashboardAuthBasicRealm = `Basic realm="MAVLink Anywhere", charset="UTF-8"`
+)
 
 // NewServer creates a new API server instance.
 func NewServer(configPath, envPath, version string) *Server {
@@ -69,7 +75,7 @@ func (s *Server) Router() http.Handler {
 	fileServer := http.FileServer(http.FS(staticFS))
 	mux.Handle("/", fileServer)
 
-	return withCORS(withMutationAuth(mux))
+	return withCORS(withDashboardAuth(withMutationAuth(mux)))
 }
 
 // withCORS wraps a handler with CORS headers for development.
@@ -96,14 +102,26 @@ func withMutationAuth(h http.Handler) http.Handler {
 			h.ServeHTTP(w, r)
 			return
 		}
+		if dashboardAuthConfigured() {
+			w.Header().Set("WWW-Authenticate", dashboardAuthBasicRealm)
+			writeError(w, http.StatusUnauthorized, "dashboard authentication required")
+			return
+		}
+		if strings.TrimSpace(os.Getenv(mutationTokenEnv)) != "" {
+			writeError(w, http.StatusForbidden, "invalid MAVLink Anywhere mutation token")
+			return
+		}
 		writeError(w, http.StatusForbidden, mutationTokenEnv+" is required for remote mutating requests")
 	})
 }
 
 func mutationAccessAllowed(r *http.Request) bool {
+	if isLoopbackRemote(r.RemoteAddr) || dashboardBasicAuthAllowed(r) {
+		return true
+	}
 	expected := strings.TrimSpace(os.Getenv(mutationTokenEnv))
 	if expected == "" {
-		return isLoopbackRemote(r.RemoteAddr)
+		return false
 	}
 	supplied := strings.TrimSpace(r.Header.Get("X-Mavlink-Anywhere-Token"))
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
@@ -111,6 +129,42 @@ func mutationAccessAllowed(r *http.Request) bool {
 		supplied = strings.TrimSpace(auth[7:])
 	}
 	return supplied != "" && subtle.ConstantTimeCompare([]byte(supplied), []byte(expected)) == 1
+}
+
+func dashboardAuthConfigured() bool {
+	return strings.TrimSpace(os.Getenv(dashboardAuthUserEnv)) != "" &&
+		strings.TrimSpace(os.Getenv(dashboardAuthBcryptEnv)) != ""
+}
+
+func dashboardBasicAuthAllowed(r *http.Request) bool {
+	expectedUser := strings.TrimSpace(os.Getenv(dashboardAuthUserEnv))
+	expectedHash := strings.TrimSpace(os.Getenv(dashboardAuthBcryptEnv))
+	if expectedUser == "" || expectedHash == "" {
+		return false
+	}
+	user, password, ok := r.BasicAuth()
+	if !ok {
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(user), []byte(expectedUser)) != 1 {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(expectedHash), []byte(password)) == nil
+}
+
+func withDashboardAuth(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions ||
+			!dashboardAuthConfigured() ||
+			isLoopbackRemote(r.RemoteAddr) ||
+			mutationAccessAllowed(r) ||
+			dashboardBasicAuthAllowed(r) {
+			h.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("WWW-Authenticate", dashboardAuthBasicRealm)
+		writeError(w, http.StatusUnauthorized, "dashboard authentication required")
+	})
 }
 
 func isLoopbackRemote(remoteAddr string) bool {

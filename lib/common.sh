@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Common Utilities
 # =============================================================================
-# Version: 3.0.10
+# Version: 3.0.11
 # Description: Core utilities - colors, logging, shared functions
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
@@ -16,7 +16,7 @@ _MAVLINK_COMMON_LOADED=1
 # CONSTANTS
 # =============================================================================
 
-readonly MAVLINK_ANYWHERE_VERSION="3.0.10"
+readonly MAVLINK_ANYWHERE_VERSION="3.0.11"
 readonly MAVLINK_ROUTER_CONFIG_DIR="/etc/mavlink-router"
 readonly MAVLINK_ROUTER_CONFIG_FILE="${MAVLINK_ROUTER_CONFIG_DIR}/main.conf"
 readonly MAVLINK_ROUTER_ENV_FILE="/etc/default/mavlink-router"
@@ -40,6 +40,7 @@ readonly DEFAULT_GCS_LISTEN_PORT="14550"
 # Dashboard
 readonly DASHBOARD_BINARY_NAME="mavlink-anywhere"
 readonly DASHBOARD_INSTALL_DIR="/opt/mavlink-anywhere"
+readonly DASHBOARD_ENV_FILE="/etc/mavlink-anywhere/dashboard.env"
 readonly DASHBOARD_PORT="9070"
 readonly DASHBOARD_SERVICE="mavlink-anywhere-dashboard"
 readonly DASHBOARD_RELEASES_URL="https://github.com/alireza787b/mavlink-anywhere/releases"

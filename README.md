@@ -5,7 +5,7 @@
 ![MAVLink Anywhere logo](assets/brand/mavlink-anywhere-logo.svg)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.0.10-blue.svg)](configure_mavlink_router.sh)
+[![Version](https://img.shields.io/badge/version-3.0.11-blue.svg)](configure_mavlink_router.sh)
 [![MAVLink](https://img.shields.io/badge/MAVLink-routing-20D6FF.svg)](https://mavlink.io/)
 [![Dashboard](https://img.shields.io/badge/dashboard-9070-F4B942.svg)](docs/DASHBOARD.md)
 
@@ -78,8 +78,20 @@ http://127.0.0.1:9070
 Manage endpoints, inspect MAVLink health, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
 To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
 
+When the dashboard is exposed on a non-loopback address and no dashboard auth is
+already configured, the configure script generates browser login credentials,
+stores only a bcrypt password hash in `/etc/mavlink-anywhere/dashboard.env`, and
+prints the generated password once. The default generated username is `admin`.
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-auth-user operator \
+  --dashboard-auth-password-file /root/mavlink-dashboard-password
+```
+
 Do not expose the dashboard to a public network without VPN, firewall, reverse
-proxy, or future sidecar auth hardening.
+proxy, and dashboard browser auth.
 
 The dashboard can also export the current effective routing profile, preview imported profiles, apply them with automatic backup, and restore the last good dashboard-managed backup. Fleet profile APIs support MDS Fleet Ops dry-run/apply workflows while preserving node-local hardware input settings by default.
 
@@ -247,9 +259,13 @@ editing `/etc/mavlink-router/main.conf` directly:
   confirmation and still preserves the hardware input overlay.
 
 Set `MAVLINK_ANYWHERE_API_TOKEN` before exposing mutating dashboard APIs beyond
-loopback. Read-only API responses can still reveal routing topology and system
-metadata, so keep network exposure behind VPN/firewall controls. MDS Fleet Ops
-sends the matching bearer token through `MDS_SIDECAR_PROFILE_TOKEN`.
+loopback for machine clients. Browser users use
+`MAVLINK_ANYWHERE_DASHBOARD_USER` plus
+`MAVLINK_ANYWHERE_DASHBOARD_PASSWORD_BCRYPT`; once authenticated, dashboard
+save/delete/service controls work without putting the machine token into
+JavaScript. Read-only API responses can still reveal routing topology and
+system metadata, so keep network exposure behind VPN/firewall controls. MDS
+Fleet Ops sends the matching bearer token through `MDS_SIDECAR_PROFILE_TOKEN`.
 
 ---
 

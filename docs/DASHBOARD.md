@@ -135,17 +135,29 @@ sudo systemctl disable mavlink-anywhere-dashboard
 | Access | Auth Required | Rationale |
 |--------|--------------|-----------|
 | `127.0.0.1:9070` (default) | None | Same trust level as SSH |
-| `0.0.0.0:9070` (explicit) | Mutating APIs require `MAVLINK_ANYWHERE_API_TOKEN` | Use only on a VPN/trusted admin network; read-only APIs still expose topology, system, and log metadata |
+| `0.0.0.0:9070` (explicit) | Browser Basic Auth for dashboard users; `MAVLINK_ANYWHERE_API_TOKEN` for machine mutations | Use only on a VPN/trusted admin network |
 
 The dashboard binds to `127.0.0.1` by default; it is only accessible from the
-device itself or via SSH tunnel. Before exposing it on a network, set
-`MAVLINK_ANYWHERE_API_TOKEN`, restrict access with firewall/VPN policy, and
-understand that read-only API responses may reveal routing topology and system
-metadata. To expose it explicitly:
+device itself or via SSH tunnel. Before exposing it on a network, configure
+browser auth, set `MAVLINK_ANYWHERE_API_TOKEN` for machine clients, restrict
+access with firewall/VPN policy, and understand that read-only API responses may
+reveal routing topology and system metadata. To expose it explicitly:
 
 ```bash
 sudo ./configure_mavlink_router.sh --install-dashboard \
   --dashboard-listen 0.0.0.0:9070
+```
+
+If no dashboard auth exists yet, the configure script generates a browser
+password and prints it once. The default generated username is `admin`. To
+provide a known credential without putting it in shell history, use a
+root-readable password file:
+
+```bash
+sudo ./configure_mavlink_router.sh --install-dashboard \
+  --dashboard-listen 0.0.0.0:9070 \
+  --dashboard-auth-user operator \
+  --dashboard-auth-password-file /root/mavlink-dashboard-password
 ```
 
 ## GCS Server Endpoint (Port 14550)
@@ -325,8 +337,11 @@ Safety rules:
   `{profile, mode}` request or a fleet `{dry_run_id, confirmation}` request.
   Fleet confirmation accepts `confirmation.confirmation_token`; `token` is kept
   as a backward-compatible alias for direct sidecar clients.
-- Remote mutating requests require `MAVLINK_ANYWHERE_API_TOKEN`; loopback
+- Remote machine mutations require `MAVLINK_ANYWHERE_API_TOKEN`; loopback
   remains usable for standalone local operation when the token is unset.
+- Remote browser users can mutate after HTTP Basic Auth when
+  `MAVLINK_ANYWHERE_DASHBOARD_USER` and
+  `MAVLINK_ANYWHERE_DASHBOARD_PASSWORD_BCRYPT` are configured.
 - If the config write succeeds but the companion environment write fails, the
   previous config/env files are restored.
 

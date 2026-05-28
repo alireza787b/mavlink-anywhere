@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const validFleetBaselineJSON = `{
@@ -46,6 +48,52 @@ func TestRemoteMutationAcceptsConfiguredToken(t *testing.T) {
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected token-authenticated validation to succeed, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"valid":true`) {
+		t.Fatalf("expected valid baseline response, got %s", recorder.Body.String())
+	}
+}
+
+func TestRemoteDashboardRequiresBasicAuthWhenConfigured(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("field-pass"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	t.Setenv(dashboardAuthUserEnv, "operator")
+	t.Setenv(dashboardAuthBcryptEnv, string(hash))
+	server := NewServer("main.conf", "env", "test")
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	request.RemoteAddr = "198.51.100.4:50000"
+	recorder := httptest.NewRecorder()
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Header().Get("WWW-Authenticate") == "" {
+		t.Fatalf("expected basic auth challenge")
+	}
+}
+
+func TestRemoteDashboardBasicAuthAllowsMutation(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("field-pass"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	t.Setenv(dashboardAuthUserEnv, "operator")
+	t.Setenv(dashboardAuthBcryptEnv, string(hash))
+	server := NewServer("main.conf", "env", "test")
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/validate", strings.NewReader(validFleetBaselineJSON))
+	request.RemoteAddr = "198.51.100.4:50000"
+	request.Header.Set("Content-Type", "application/json")
+	request.SetBasicAuth("operator", "field-pass")
+	recorder := httptest.NewRecorder()
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected basic-authenticated validation to succeed, got %d: %s", recorder.Code, recorder.Body.String())
 	}
 	if !strings.Contains(recorder.Body.String(), `"valid":true`) {
 		t.Fatalf("expected valid baseline response, got %s", recorder.Body.String())
