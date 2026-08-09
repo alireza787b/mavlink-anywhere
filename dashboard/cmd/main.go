@@ -21,7 +21,11 @@ var (
 )
 
 func main() {
-	listen := flag.String("listen", "127.0.0.1:9070", "Address and port to listen on")
+	defaultListen := strings.TrimSpace(os.Getenv("MAVLINK_ANYWHERE_DASHBOARD_LISTEN"))
+	if defaultListen == "" {
+		defaultListen = "127.0.0.1:9070"
+	}
+	listen := flag.String("listen", defaultListen, "Address and port to listen on")
 	configPath := flag.String("config", "/etc/mavlink-router/main.conf", "Path to mavlink-router config file")
 	envPath := flag.String("env", "/etc/default/mavlink-router", "Path to mavlink-router env file")
 	version := flag.Bool("version", false, "Print version and exit")

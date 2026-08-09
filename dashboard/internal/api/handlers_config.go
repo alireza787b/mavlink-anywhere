@@ -47,10 +47,13 @@ func (s *Server) putConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := config.WriteRawConfig(s.configPath, s.envPath, payload.Raw); err != nil {
+	restarted, err := s.applyRouterMutation(func() error {
+		return config.WriteRawConfig(s.configPath, s.envPath, payload.Raw)
+	})
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "Failed to write config: "+err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "config updated"})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "config updated", "restarted": restarted})
 }

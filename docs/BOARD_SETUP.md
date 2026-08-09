@@ -1,96 +1,115 @@
-# Board Setup And Dashboard Auth
+# First board setup
 
-This guide is for a new Linux companion computer that should run MAVLink
-Anywhere with the optional dashboard.
+Use this checklist for a new Raspberry Pi, Jetson, or Debian/Ubuntu companion computer.
 
-## Recommended Field Setup
-
-1. Create or verify the operator SSH user and sudo policy.
-2. Install `mavlink-router`, `curl`, `systemd`, and serial/UDP prerequisites.
-3. Clone the repo under a persistent path such as `/opt/mavlink-anywhere`.
-4. Run the configure script with browser auth:
+## 1. Connect and update
 
 ```bash
-cd /opt/mavlink-anywhere
-sudo git fetch --tags origin
-sudo git checkout -f v3.0.14
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-auth-user admin \
-  --dashboard-auth-prompt \
-  --dashboard-ufw-rule
+ssh pi@PI_IP
+sudo apt update
 ```
 
-Use a non-default username for shared or production deployments. Supply the
-actual password out of band; do not paste it into chat, Git, shell history, or
-reports.
-
-For noninteractive automation, prefer stdin or a root-readable file:
+## 2. Get MAVLink Anywhere
 
 ```bash
-printf '%s' "$MAVLINK_DASHBOARD_PASSWORD" | sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-auth-user admin \
-  --dashboard-auth-password-stdin \
-  --dashboard-ufw-rule
+git clone https://github.com/alireza787b/mavlink-anywhere.git
+cd mavlink-anywhere
+sudo ./install_mavlink_router.sh
 ```
 
-`--dashboard-auth-password PASSWORD` also exists for constrained lab automation,
-but it can leak through shell history and process listings. Prefer prompt,
-stdin, file, or bcrypt hash.
+The installer builds the upstream `mavlink-routerd` service. This can take several minutes on a small Pi.
 
-## Firewall
+## 3. Connect the flight controller
 
-The configure script does not change firewall policy unless requested. Add
-`--dashboard-ufw-rule` or `--ufw-rule` to allow the dashboard TCP port when UFW
-is active and the dashboard listens on a non-loopback address.
+For a Pixhawk UART connection, wire TX to RX, RX to TX, and ground to ground. Confirm that the voltage level is safe for both boards. Do not power a flight controller from an unknown companion-computer rail.
 
-Without that flag, use:
+For a USB adapter, connect it before configuration and look for `/dev/ttyUSB0` or `/dev/ttyACM0`.
+
+More detail: [UART setup](UART-SETUP.md).
+
+## 4. Configure
 
 ```bash
-sudo ufw allow 9070/tcp
+sudo ./configure_mavlink_router.sh
 ```
 
-## Release Binaries And Go
-
-Published dashboard binaries are static Go binaries and do not require Go on the
-board. Password hashing uses Go's pure-Go bcrypt implementation and does not
-require CGO at runtime.
-
-The configure script falls back to building from local source only when the
-release asset is unavailable, invalid, or fails the on-board password-hash smoke
-test. If you rely on that fallback, install Go in a persistent path such as
-`/opt/go` or through the OS package manager. Do not depend on a toolchain under
-`/tmp`; many boards mount `/tmp` as tmpfs.
-
-Release maintainers should build assets with:
+Follow the prompts. On a Raspberry Pi, setup can enable UART and disable the Linux serial console. That boot change requires one reboot:
 
 ```bash
-./scripts/build_release_assets.sh
+sudo reboot
 ```
 
-The build script uses `CGO_ENABLED=0` and smoke-tests password hashing on the
-host architecture.
+Reconnect, return to the checkout, and run configure again.
 
-## Verify
+## 5. Check the router
 
 ```bash
-systemctl is-active mavlink-router mavlink-anywhere-dashboard
-/opt/mavlink-anywhere/mavlink-anywhere --version
-curl -u admin http://127.0.0.1:9070/api/v1/status
-./scripts/check_dashboard_version.sh
+mla status
+mla logs
 ```
 
-Remote mutation from the browser requires dashboard login plus the bundled
-CSRF header. Machine clients should use `MAVLINK_ANYWHERE_API_TOKEN`.
+Press `Ctrl+C` to leave logs.
 
-## Drift Checks
+Connect QGroundControl to the board's IP on UDP `14550`. QGroundControl must send first because the default `gcs_listen` route learns the most recent UDP sender.
 
-Run the version check locally, from cron, or from fleet orchestration:
+## 6. Dashboard access
+
+The dashboard is local-only by default. From your computer:
 
 ```bash
-/opt/mavlink-anywhere/scripts/check_dashboard_version.sh 3.0.14
+ssh -L 9070:127.0.0.1:9070 pi@PI_IP
 ```
 
-MDS Fleet Ops also reports installed sidecar versions and sidecar profile drift
-for enrolled boards.
+Then open `http://127.0.0.1:9070`.
+
+For a trusted LAN or VPN:
+
+```bash
+sudo mla dashboard expose
+```
+
+Undo exposure:
+
+```bash
+sudo mla dashboard hide
+```
+
+Reset its password:
+
+```bash
+sudo mla dashboard password reset
+```
+
+## 7. Add destinations
+
+Examples:
+
+```bash
+sudo mla endpoint add mavsdk 127.0.0.1 14540
+sudo mla endpoint add qgc_vpn 100.80.10.20 24550
+mla endpoint list
+```
+
+Use addresses that belong to your real device or VPN. Documentation examples are placeholders.
+
+## Update this board later
+
+```bash
+cd ~/mavlink-anywhere
+git fetch --tags origin
+git switch main
+git pull --ff-only
+sudo ./configure_mavlink_router.sh --install-dashboard
+mla status
+```
+
+This leaves `/etc/mavlink-router/main.conf`, dashboard credentials, tokens, and the saved local/exposed state in place.
+
+## Final checklist
+
+- `mla status` says the router is running.
+- The input device and baud match the Pixhawk telemetry port.
+- QGroundControl receives a heartbeat.
+- Only required routes are enabled.
+- `mla dashboard status` says `local only` unless you intentionally exposed it.
+- A remotely exposed dashboard has a browser login.

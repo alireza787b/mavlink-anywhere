@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere Library: Configuration Generation
 # =============================================================================
-# Version: 3.0.14
+# Version: 3.1.0
 # Description: Generate mavlink-router configuration files
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere

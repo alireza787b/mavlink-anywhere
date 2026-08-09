@@ -18,6 +18,13 @@ jobs:
           go-version: '1.22'
           cache: false
 
+      - name: Test shell, CLI config helper, and dashboard
+        run: |
+          bash -n configure_mavlink_router.sh install_mavlink_router.sh mavlink-router-cli.sh lib/*.sh scripts/*.sh
+          python3 -m unittest discover -s tests -v
+          cd dashboard
+          go test ./...
+
       - name: Build and smoke-test dashboard assets
         run: ./scripts/build_release_assets.sh "$PWD/build"
 

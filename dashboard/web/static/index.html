@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <title>mavlink-anywhere Dashboard</title>
+    <title>MAVLink Anywhere</title>
     <link rel="stylesheet" href="style.css">
     <script defer src="app.js"></script>
     <script defer src="alpine.min.js"></script>
@@ -16,7 +16,7 @@
     <!-- Header -->
     <header class="header">
         <div class="header-left">
-            <h1 class="logo"><svg class="brand-mark" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#09111c"/><circle cx="26" cy="48" r="7" fill="#f8fbff"/><circle cx="70" cy="27" r="7" fill="#20d6ff"/><circle cx="70" cy="69" r="7" fill="#f4b942"/><path d="M32 45c13-9 21-13 31-16" fill="none" stroke="#f8fbff" stroke-width="5" stroke-linecap="round"/><path d="M32 51c13 9 21 13 31 16" fill="none" stroke="#f8fbff" stroke-width="5" stroke-linecap="round"/><path d="M78 27 67 21v12z" fill="#f8fbff"/><path d="M78 69 67 63v12z" fill="#f8fbff"/></svg> mavlink-anywhere</h1>
+            <h1 class="logo"><svg class="brand-mark" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#09111c"/><circle cx="26" cy="48" r="7" fill="#f8fbff"/><circle cx="70" cy="27" r="7" fill="#20d6ff"/><circle cx="70" cy="69" r="7" fill="#f4b942"/><path d="M32 45c13-9 21-13 31-16" fill="none" stroke="#f8fbff" stroke-width="5" stroke-linecap="round"/><path d="M32 51c13 9 21 13 31 16" fill="none" stroke="#f8fbff" stroke-width="5" stroke-linecap="round"/><path d="M78 27 67 21v12z" fill="#f8fbff"/><path d="M78 69 67 63v12z" fill="#f8fbff"/></svg> MAVLink Anywhere</h1>
             <span class="version" x-text="status.version" x-show="status.version"></span>
         </div>
         <div class="header-right">
@@ -37,14 +37,17 @@
     <!-- Main content -->
     <main class="main">
 
+        <div class="welcome">
+            <h2>Your MAVLink routes</h2>
+            <p>Input is where flight data arrives. Outputs are the places that receive a copy.</p>
+        </div>
+
         <!-- Service Control + Input Source row -->
         <div class="card-row">
             <!-- Service Control -->
             <div class="card">
-                <h2 class="card-title">Service Control</h2>
+                <h2 class="card-title">Router</h2>
                 <div class="btn-group">
-                    <button class="btn btn-success" @click="serviceAction('start')" :disabled="loading.service">Start</button>
-                    <button class="btn btn-danger" @click="serviceAction('stop')" :disabled="loading.service">Stop</button>
                     <button class="btn btn-primary" @click="serviceAction('restart')" :disabled="loading.service">Restart</button>
                 </div>
                 <div class="service-info">
@@ -54,6 +57,13 @@
                               x-text="status.service?.enabled ? 'Yes' : 'No'"></span>
                     </label>
                 </div>
+                <details class="small-details">
+                    <summary>Start or stop</summary>
+                    <div class="btn-group detail-actions">
+                        <button class="btn btn-success" @click="serviceAction('start')" :disabled="loading.service">Start</button>
+                        <button class="btn btn-danger" @click="serviceAction('stop')" :disabled="loading.service">Stop</button>
+                    </div>
+                </details>
             </div>
 
             <!-- Input Source -->
@@ -90,7 +100,10 @@
                     <h2 class="card-title">MAVLink Health</h2>
                     <span class="status-badge" :class="mavlinkStateClass" x-text="mavlinkStateLabel"></span>
                 </div>
-                <div class="system-grid" x-show="diagnostics.mavlink">
+                <p class="health-summary" x-show="diagnostics.mavlink?.active">Heartbeat traffic is reaching the router.</p>
+                <details class="small-details" x-show="diagnostics.mavlink">
+                  <summary>Technical details</summary>
+                  <div class="system-grid health-grid">
                     <div class="system-item">
                         <span class="system-label">Source</span>
                         <span x-text="diagnostics.mavlink?.source || 'Unknown'"></span>
@@ -131,7 +144,8 @@
                         <span class="system-label">State</span>
                         <span x-text="diagnostics.mavlink.systemStatus"></span>
                     </div>
-                </div>
+                  </div>
+                </details>
                 <div class="detail-line" x-show="diagnostics.mavlink?.note">
                     <span x-text="diagnostics.mavlink.note"></span>
                 </div>
@@ -140,14 +154,11 @@
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card" x-show="diagnostics.alerts?.length">
                 <div class="card-header-row">
                     <h2 class="card-title">Warnings</h2>
                     <span class="badge" :class="diagnostics.alerts?.length ? 'badge-yellow' : 'badge-green'"
                           x-text="diagnostics.alerts?.length || 0"></span>
-                </div>
-                <div class="empty-state" x-show="!diagnostics.alerts || diagnostics.alerts.length === 0">
-                    No config or firewall warnings detected.
                 </div>
                 <template x-for="alert in diagnostics.alerts" :key="alert.code">
                     <div class="warning-card" :class="'warning-' + alert.level">
@@ -163,9 +174,11 @@
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header-row">
-                <h2 class="card-title">Profiles</h2>
+        <details class="card advanced-card">
+            <summary>Profiles and backups</summary>
+            <div class="advanced-card-body">
+              <div class="card-header-row">
+                <h2 class="card-title">Routing profiles</h2>
                 <div class="card-actions">
                     <button class="btn btn-sm btn-outline" @click="exportProfile()">Export</button>
                     <button class="btn btn-sm btn-outline" @click="openProfilePicker()">Import</button>
@@ -194,7 +207,8 @@
                     <span>Replace current routing or merge named endpoints into the current config.</span>
                 </div>
             </div>
-        </div>
+            </div>
+        </details>
 
         <!-- Routing -->
         <div class="card">
@@ -203,10 +217,11 @@
                 <div class="card-actions">
                     <button class="btn btn-sm btn-outline" @click="showAddWizard = true">+ Add Endpoint</button>
                     <button class="btn btn-sm btn-outline" @click="showRawConfig = !showRawConfig"
-                            x-text="showRawConfig ? 'Card View' : 'Raw Config'"></button>
+                            x-text="showRawConfig ? 'Simple View' : 'Advanced: Raw Config'"></button>
                     <a class="btn btn-sm btn-outline doc-btn" :href="diagnostics.docs?.dashboard" target="_blank" rel="noreferrer">Docs</a>
                 </div>
             </div>
+            <p class="card-intro">Add a destination for QGroundControl, MAVSDK, a VPN peer, or another MAVLink tool.</p>
 
             <!-- Card view -->
             <div x-show="!showRawConfig">
@@ -281,6 +296,7 @@
 
             <!-- Raw config view -->
             <div x-show="showRawConfig">
+                <div class="raw-warning">Advanced: a bad raw config can interrupt flight-data routing. Invalid changes are rejected and the previous config is backed up.</div>
                 <textarea class="raw-config" x-model="rawConfig" rows="20"></textarea>
                 <div class="raw-config-actions">
                     <button class="btn btn-primary" @click="saveRawConfig()" :disabled="loading.config">Save Config</button>
@@ -460,8 +476,10 @@
         </div>
 
         <!-- Live Logs -->
-        <div class="card">
-            <div class="card-header-row">
+        <details class="card advanced-card">
+            <summary>Logs</summary>
+            <div class="advanced-card-body">
+              <div class="card-header-row">
                 <h2 class="card-title">Live Logs</h2>
                 <div class="card-actions">
                     <button class="btn btn-sm btn-outline" @click="toggleLogs()"
@@ -477,11 +495,14 @@
                     No log data. Service may not be running.
                 </div>
             </div>
-        </div>
+            </div>
+        </details>
 
         <!-- System Info -->
-        <div class="card">
-            <h2 class="card-title">System Info</h2>
+        <details class="card advanced-card">
+          <summary>System details</summary>
+          <div class="advanced-card-body">
+            <h2 class="card-title">Board and firewall</h2>
             <div class="system-grid" x-show="systemInfo?.board">
                 <div class="system-item">
                     <span class="system-label">Board</span>
@@ -509,7 +530,8 @@
                     <span x-text="systemInfo.board?.totalRam || 'unknown'"></span>
                 </div>
             </div>
-        </div>
+          </div>
+        </details>
 
     </main>
 

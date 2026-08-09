@@ -1,328 +1,228 @@
 # MAVLink Anywhere
 
-**Portable MAVLink routing for drones, companion computers, GCS links, LTE, Wi-Fi, VPNs, UDP, and serial.**
+Route MAVLink between a Pixhawk or simulator, a Linux companion computer, and the tools that need flight data.
 
 ![MAVLink Anywhere logo](assets/brand/mavlink-anywhere-logo.svg)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.0.14-blue.svg)](configure_mavlink_router.sh)
-[![MAVLink](https://img.shields.io/badge/MAVLink-routing-20D6FF.svg)](https://mavlink.io/)
-[![Dashboard](https://img.shields.io/badge/dashboard-9070-F4B942.svg)](docs/DASHBOARD.md)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](configure_mavlink_router.sh)
 
-MAVLink Anywhere routes MAVLink data from a flight controller
-(Pixhawk/ArduPilot/PX4) through a companion computer to ground stations, SDKs,
-remote operators, local QGroundControl fallback links, and MDS Fleet Ops.
-
-## Ecosystem Fit
-
-| Tool | Role |
-|------|------|
-| **MAVLink Anywhere** | companion-computer MAVLink routing and endpoint dashboard |
-| **[MDS](https://github.com/alireza787b/mavsdk_drone_show)** | fleet operations, SITL, real drone dashboard, sidecar profile status |
-| **[Smart Wi-Fi Manager](https://github.com/alireza787b/smart-wifi-manager)** | Wi-Fi profile priority and field connectivity |
-
----
-
-## Video Tutorial
-
-**First time here? Watch the video!**
-
-[![MAVLink Anywhere Tutorial](https://img.youtube.com/vi/_QEWpoy6HSo/0.jpg)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
-
-[Complete Setup Guide (YouTube)](https://www.youtube.com/watch?v=_QEWpoy6HSo)
-
----
-
-## Quick Start
-
-### Step 1: Clone & Install
+## Install on a Raspberry Pi or Linux computer
 
 ```bash
 git clone https://github.com/alireza787b/mavlink-anywhere.git
 cd mavlink-anywhere
 sudo ./install_mavlink_router.sh
-```
-
-### Step 2: Configure
-
-```bash
 sudo ./configure_mavlink_router.sh
 ```
 
-The script will:
-- **Detect your platform** (Raspberry Pi, Jetson, generic Linux)
-- **Check serial port** configuration
-- **Guide you** through any needed setup (with auto-fix option on Raspberry Pi)
-- **Configure** mavlink-router with your settings
+Follow the prompts. On a Raspberry Pi, the serial setup may ask for one reboot. After rebooting, run the last command again.
 
-> **Note:** On Raspberry Pi, if serial port needs configuration, the script will offer to fix it automatically. This requires a **reboot**, after which you run the configure script again.
-
-### Step 3: Verify
+Check the result:
 
 ```bash
-sudo systemctl status mavlink-router
+mla status
 ```
 
-You should see `active (running)`. Connect your ground station to the configured UDP ports.
+By default:
 
----
+- Pixhawk data comes from the serial device chosen during setup.
+- QGroundControl can connect to the Pi's IP on UDP port `14550`.
+- The optional dashboard runs locally at `http://127.0.0.1:9070`.
 
-### Step 4: Open Dashboard (Optional)
-
-The configure script automatically installs a web dashboard bound to localhost by default. On supported release architectures it downloads a prebuilt binary; if that asset is unavailable, it falls back to a local Go source build before dropping back to CLI-only mode. Minimal hosts do not need the external `file(1)` package for dashboard installation.
-
-```
-http://127.0.0.1:9070
-```
-
-Manage endpoints, inspect MAVLink health, view logs, and control the service from your browser. Skip with `--skip-dashboard`.
-To expose it on the network, use `--dashboard-listen 0.0.0.0:9070`.
-
-When the dashboard is exposed on a non-loopback address and no dashboard auth is
-already configured, the configure script generates browser login credentials,
-stores only a bcrypt password hash in `/etc/mavlink-anywhere/dashboard.env`, and
-prints the generated password once. The default generated username is `admin`.
+## The command you need
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-auth-user operator \
-  --dashboard-auth-password-file /root/mavlink-dashboard-password
+mla help
 ```
 
-For interactive setup or password rotation, use `--dashboard-auth-prompt`.
-For MDS/Fleet Ops or other machine clients, also configure a bearer token with
-`--dashboard-generate-api-token` or `--dashboard-api-token-file`.
-
-For headless automation, use `--dashboard-auth-password-stdin` or
-`--dashboard-auth-password-file`. `--dashboard-auth-password PASSWORD` exists
-for constrained lab automation, but it is not recommended because shell history
-and process listings can expose it.
-
-If UFW is active, add `--dashboard-ufw-rule` to allow TCP `9070`
-automatically when the dashboard listens on a non-loopback address.
-
-An unauthenticated remote dashboard is still available for isolated lab demos:
-use `--dashboard-open-lab-mode`. Do not use that mode on a shared LAN, VPN, or
-field network.
-
-Do not expose the dashboard to a public network without VPN, firewall, reverse
-proxy, and dashboard browser auth.
-
-The dashboard can also export the current effective routing profile, preview imported profiles, apply them with automatic backup, and restore the last good dashboard-managed backup. Fleet profile APIs support MDS Fleet Ops dry-run/apply workflows while preserving node-local hardware input settings by default.
-
-## That's It
-
-The configure script handles everything - platform detection, serial setup, configuration, and dashboard.
-
-`gcs_listen` on `14550/udp` is enabled by default for ad-hoc field access, so QGroundControl can point to `<device-ip>:14550` without pre-configuring a remote IP on the device. This follows `mavlink-router` UDP server semantics: the active remote is the last sender on that listener. Keep local consumers such as MAVSDK and mavlink2rest on explicit localhost endpoints, and use explicit `Mode=Normal` endpoints or the built-in TCP server on `5760/tcp` when you need deterministic or multi-client remote access.
-
----
-
-## Documentation
-
-| Guide | Description |
-|-------|-------------|
-| [Web Dashboard](docs/DASHBOARD.md) | Dashboard access, API reference, and configuration |
-| [Board Setup And Dashboard Auth](docs/BOARD_SETUP.md) | New board bring-up, dashboard auth, firewall, and version drift checks |
-| [UART Setup Guide](docs/UART-SETUP.md) | Detailed serial port configuration and wiring |
-| [CLI Reference](docs/CLI-REFERENCE.md) | All command-line options |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |
-
----
-
-## Advanced Usage
-
-### Auto Mode (Minimal Prompts)
+It points to short help for every common task:
 
 ```bash
-sudo ./configure_mavlink_router.sh --auto --gcs-ip 192.168.1.100
+mla help endpoint
+mla help input
+mla help dashboard
+mla help config
 ```
 
-### Headless Mode (No Prompts)
+Use `sudo` for commands that change settings.
+
+## Manage MAVLink routes
+
+List routes:
 
 ```bash
-sudo ./configure_mavlink_router.sh --headless \
-    --uart /dev/ttyS0 \
-    --baud 57600 \
-    --endpoints "127.0.0.1:14540,127.0.0.1:14569,192.168.1.100:24550"
+mla endpoint list
 ```
 
-### USB Serial (No Boot Config Needed)
+Send MAVLink to QGroundControl at `192.168.1.50`:
 
 ```bash
-sudo ./configure_mavlink_router.sh --auto --uart /dev/ttyUSB0
+sudo mla endpoint add qgc 192.168.1.50 14550
 ```
 
-### UDP Input (For Simulation)
+Change, temporarily disable, or remove it:
 
 ```bash
-sudo ./configure_mavlink_router.sh --headless \
-    --input-type udp \
-    --input-port 14550 \
-    --endpoints "127.0.0.1:14540,127.0.0.1:14569"
+sudo mla endpoint edit qgc 100.80.10.20 24550
+sudo mla endpoint disable qgc
+sudo mla endpoint enable qgc
+sudo mla endpoint remove qgc
 ```
 
----
+Changes are validated and backed up. If the running router cannot restart, MLA restores the previous files.
 
-## Common Commands
+## Change the flight-data input
 
-### Service Management
+Pixhawk on the Raspberry Pi serial port:
 
 ```bash
-# Check status
-sudo systemctl status mavlink-router
-
-# View live logs
-sudo journalctl -u mavlink-router -f
-
-# Restart service
-sudo systemctl restart mavlink-router
-
-# Stop/Start
-sudo systemctl stop mavlink-router
-sudo systemctl start mavlink-router
+sudo mla input uart /dev/serial0 57600
 ```
 
-### Change Endpoints
+USB serial adapter:
 
 ```bash
-# Re-run interactive config
-sudo ./configure_mavlink_router.sh
-
-# Or headless with new endpoints
-sudo ./configure_mavlink_router.sh --headless \
-    --endpoints "127.0.0.1:14550,192.168.1.100:14550"
+sudo mla input uart /dev/ttyUSB0 115200
 ```
 
-### Edit Config Directly
+UDP input for SITL or another MAVLink router:
 
 ```bash
-# Edit configuration
-sudo nano /etc/mavlink-router/main.conf
-
-# Apply changes
-sudo systemctl restart mavlink-router
+sudo mla input udp 0.0.0.0 14560
 ```
 
-### CLI Helper (Optional)
+## Dashboard access
+
+The dashboard starts local-only. An SSH tunnel is the safest remote option:
 
 ```bash
-./mavlink-router-cli.sh status      # Show status & config
-./mavlink-router-cli.sh logs        # View live logs
-./mavlink-router-cli.sh endpoints   # Quick endpoint edit
-./mavlink-router-cli.sh help        # All commands
+ssh -L 9070:127.0.0.1:9070 pi@PI_IP
 ```
 
-### Update to Latest Version
+Then open `http://127.0.0.1:9070` on your computer.
+
+To expose it on a trusted LAN or VPN:
+
+```bash
+sudo mla dashboard expose
+```
+
+If no browser login exists, this creates one and prints the password once.
+
+To reverse exposure and return to local-only:
+
+```bash
+sudo mla dashboard hide
+```
+
+To stop and disable only the UI:
+
+```bash
+sudo mla dashboard off
+```
+
+Turn it back on:
+
+```bash
+sudo mla dashboard on
+```
+
+These commands do not stop MAVLink routing.
+
+### Reset the dashboard password
+
+```bash
+sudo mla dashboard password reset
+```
+
+For a generated password instead:
+
+```bash
+sudo mla dashboard password generate
+```
+
+### Manage a machine API token
+
+Use a token for MDS Fleet Ops or another program that changes routes through the API:
+
+```bash
+sudo mla dashboard token create
+sudo mla dashboard token rotate
+sudo mla dashboard token remove
+```
+
+`create` and `rotate` print the token once. Save it in your password manager or client configuration.
+
+## Raw terminal editing
+
+For full control of `main.conf`:
+
+```bash
+sudo mla config edit
+```
+
+MLA opens `$EDITOR` or `nano`, validates the file, creates a backup, syncs `/etc/default/mavlink-router`, and safely applies the change.
+
+Useful checks:
+
+```bash
+mla config show
+mla config check
+mla config path
+```
+
+## Update an existing Raspberry Pi
+
+This updates MAVLink Anywhere without replacing your router config, routes, dashboard password, token, or saved dashboard access mode:
 
 ```bash
 cd ~/mavlink-anywhere
 git fetch --tags origin
+git switch main
 git pull --ff-only
-
-# Update mavlink-anywhere dashboard/service files
 sudo ./configure_mavlink_router.sh --install-dashboard
-
-# Optional: rebuild upstream mavlink-routerd as well
-sudo ./install_mavlink_router.sh
+mla status
 ```
 
-If your dashboard is intentionally exposed on the network, re-run the dashboard step with:
+If your checkout is somewhere else, use that directory in the first command. Rebuilding upstream `mavlink-routerd` is optional and separate:
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-    --dashboard-listen 0.0.0.0:9070
+sudo ./install_mavlink_router.sh --force
 ```
 
-`--install-dashboard` refreshes the installed dashboard binary when the host is running an older `mavlink-anywhere` release.
+## Ports
 
----
+| Port | Purpose |
+|---|---|
+| `14550/udp` | Default device-side listener for a GCS |
+| `14540/udp` | Common local MAVSDK output |
+| `14569/udp` | Common local mavlink2rest output |
+| `24550/udp` | Common explicit remote/VPN GCS output |
+| `5760/tcp` | mavlink-router TCP server |
+| `9070/tcp` | Optional web dashboard |
 
-## 🔌 Supported Platforms
+## More help
 
-| Platform | Serial Config | Notes |
-|----------|--------------|-------|
-| **Raspberry Pi** | Auto-detected | Script offers auto-fix for serial setup |
-| **NVIDIA Jetson** | Manual | Ensure UART is enabled |
-| **Generic Linux** | Manual | Ensure UART device exists |
-| **USB Serial** | None needed | Just plug in adapter |
-| **UDP Input** | None needed | For SITL/simulation |
+- [CLI command reference](docs/CLI-REFERENCE.md)
+- [Dashboard and authentication](docs/DASHBOARD.md)
+- [First board setup](docs/BOARD_SETUP.md)
+- [UART and Pixhawk wiring](docs/UART-SETUP.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
 
-Dashboard release binaries are published for `arm6`, `arm64`, and `amd64`. On other Linux architectures, the configure script will try a local Go build if `go` is installed; otherwise the router still works without the dashboard.
+MAVLink Anywhere works alongside [Smart Wi-Fi Manager](https://github.com/alireza787b/smart-wifi-manager) for connectivity and [MDS](https://github.com/alireza787b/mavsdk_drone_show) for fleet operations.
 
-## Routing Profiles
+## Uninstall
 
-Use dashboard profiles when you want repeatable routing layouts without editing raw INI by hand.
+```bash
+sudo systemctl disable --now mavlink-anywhere-dashboard mavlink-router
+sudo rm /etc/systemd/system/mavlink-anywhere-dashboard.service
+sudo rm /etc/systemd/system/mavlink-router.service
+sudo rm /usr/local/bin/mla
+sudo rm -r /usr/local/lib/mavlink-anywhere
+sudo systemctl daemon-reload
+```
 
-- **Export** writes the current effective routing config to JSON
-- **Import** previews changes before apply
-- **Apply** creates a backup and restarts `mavlink-router`
-- **Restore Last Good** reverts to the latest dashboard-created backup
+Configuration is intentionally left in `/etc/mavlink-router` and `/etc/mavlink-anywhere` so it can be recovered. Remove those directories only if you no longer need the saved settings.
 
-Profiles are intentionally limited to router configuration. They do not change firewall policy or host boot serial settings.
-
-For fleet-managed deployments, use the dashboard profile API rather than
-editing `/etc/mavlink-router/main.conf` directly:
-
-- `GET /api/v1/profiles/summary` reports endpoint policy and the local hardware
-  source overlay separately.
-- `POST /api/v1/profiles/import` requires `dry_run=true` and returns a
-  confirmation token.
-- `POST /api/v1/profiles/apply` applies only a confirmed dry-run plan for
-  `fleet-merge` or `fleet-strict`.
-- `fleet-merge` preserves local extra endpoints and the hardware input overlay.
-- `fleet-strict` can prune local extra output endpoints only after advanced
-  confirmation and still preserves the hardware input overlay.
-
-Set `MAVLINK_ANYWHERE_API_TOKEN` before exposing mutating dashboard APIs beyond
-loopback for machine clients. Browser users use
-`MAVLINK_ANYWHERE_DASHBOARD_USER` plus
-`MAVLINK_ANYWHERE_DASHBOARD_PASSWORD_BCRYPT`; once authenticated, dashboard
-save/delete/service controls work without putting the machine token into
-JavaScript. Read-only API responses can still reveal routing topology and
-system metadata, so keep network exposure behind VPN/firewall controls. MDS
-Fleet Ops sends the matching bearer token through `MDS_SIDECAR_PROFILE_TOKEN`.
-
----
-
-## 🌐 Remote Connectivity
-
-For internet streaming, you need:
-
-1. **Internet** on companion computer (WiFi, 4G, Ethernet)
-2. **VPN** for secure access:
-   - [NetBird](https://netbird.io/) - Recommended (shown in video)
-   - [Tailscale](https://tailscale.com/)
-   - [WireGuard](https://www.wireguard.com/)
-
----
-
-## Integrations
-
-`mavlink-anywhere` is intentionally generic. It sets up a MAVLink router, a default GCS listen endpoint, and optional local service endpoints. Higher-level projects can automate it by passing explicit CLI arguments or by managing `/etc/mavlink-router/main.conf`.
-
-One example integration is [MAVSDK Drone Show](https://github.com/alireza787b/mavsdk_drone_show), but this repository does not assume MDS-specific defaults.
-
----
-
-## ❓ Need Help?
-
-1. **[Video Tutorial](https://www.youtube.com/watch?v=_QEWpoy6HSo)** - Most common scenarios
-2. **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues
-3. **[GitHub Issues](https://github.com/alireza787b/mavlink-anywhere/issues)** - Bug reports
-
----
-
-## 📄 License
-
-MIT License - Copyright (c) 2024 Alireza Ghaderi
-
----
-
-<p align="center">
-  <b>Made with ❤️ for the drone community</b><br>
-  <a href="https://github.com/alireza787b/mavlink-anywhere">GitHub</a> •
-  <a href="https://www.youtube.com/watch?v=_QEWpoy6HSo">Tutorial</a> •
-  <a href="docs/DASHBOARD.md">Dashboard Docs</a>
-</p>
+Licensed under the [MIT License](LICENSE).

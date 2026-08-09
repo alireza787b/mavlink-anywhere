@@ -4,3 +4,5 @@
 mavlink-anywhere-linux-*
 dashboard/mavlink-anywhere
 /tmp/
+__pycache__/
+*.py[cod]

@@ -5,7 +5,76 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/alireza787b/mavlink-anywhere/dashboard/internal/endpoints"
 )
+
+// ValidateEndpoint validates one endpoint before it reaches the config file.
+func ValidateEndpoint(ep endpoints.Endpoint) error {
+	if err := ValidateEndpointName(ep.Name); err != nil {
+		return err
+	}
+	switch ep.Type {
+	case "UartEndpoint":
+		if err := ValidateUartDevice(ep.Device); err != nil {
+			return err
+		}
+		return ValidateBaud(ep.Baud)
+	case "UdpEndpoint":
+		if err := ValidateEndpointMode(ep.Mode); err != nil {
+			return err
+		}
+		if err := ValidateIP(ep.Address); err != nil {
+			return err
+		}
+		return ValidatePort(ep.Port)
+	case "TcpEndpoint":
+		if err := ValidateIP(ep.Address); err != nil {
+			return err
+		}
+		return ValidatePort(ep.Port)
+	default:
+		return fmt.Errorf("unsupported endpoint type: %s", ep.Type)
+	}
+}
+
+// ValidateParsedConfig checks the complete effective config, including names,
+// endpoint fields, duplicate names and conflicting server-mode UDP binds.
+func ValidateParsedConfig(pc *ParsedConfig) error {
+	if pc == nil {
+		return fmt.Errorf("config is empty")
+	}
+	if err := ValidatePort(pc.General.TcpServerPort); err != nil {
+		return fmt.Errorf("TCP server: %w", err)
+	}
+	if len(pc.Endpoints) == 0 {
+		return fmt.Errorf("config must contain at least one endpoint")
+	}
+	names := map[string]bool{}
+	validated := make([]endpoints.Endpoint, 0, len(pc.Endpoints))
+	active := 0
+	for _, ep := range pc.Endpoints {
+		if names[ep.Name] {
+			return fmt.Errorf("duplicate endpoint name: %s", ep.Name)
+		}
+		names[ep.Name] = true
+		if !ep.Enabled {
+			continue
+		}
+		active++
+		if err := ValidateEndpoint(ep); err != nil {
+			return fmt.Errorf("endpoint %s: %w", ep.Name, err)
+		}
+		if err := ValidateEndpointTopology(validated, ep, ""); err != nil {
+			return err
+		}
+		validated = append(validated, ep)
+	}
+	if active == 0 {
+		return fmt.Errorf("config must contain at least one enabled endpoint")
+	}
+	return nil
+}
 
 // ValidateIP checks if a string is a valid IPv4 address.
 func ValidateIP(ip string) error {
@@ -58,13 +127,10 @@ func ValidateEndpointName(name string) error {
 
 // ValidateBaud checks if a baud rate is valid.
 func ValidateBaud(baud int) error {
-	validBauds := []int{9600, 19200, 38400, 57600, 115200, 230400, 460800, 500000, 921600, 1000000}
-	for _, v := range validBauds {
-		if baud == v {
-			return nil
-		}
+	if baud < 1200 || baud > 4000000 {
+		return fmt.Errorf("invalid baud rate: %d (common values: 57600, 115200, 921600)", baud)
 	}
-	return fmt.Errorf("invalid baud rate: %d (common values: 57600, 115200, 921600)", baud)
+	return nil
 }
 
 // ValidateUartDevice checks basic UART device path validity.

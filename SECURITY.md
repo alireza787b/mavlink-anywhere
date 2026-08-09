@@ -25,18 +25,19 @@ the surrounding network is trusted.
 
 ## Credential Operations
 
-- Set or rotate the browser password with `sudo ./configure_mavlink_router.sh
-  --install-dashboard --dashboard-auth-user USER --dashboard-auth-prompt`.
+- Set or rotate the browser password with `sudo mla dashboard password reset`.
+- Return an exposed dashboard to loopback with `sudo mla dashboard hide`, or
+  stop the UI with `sudo mla dashboard off`.
+- Create or rotate the machine token with `sudo mla dashboard token create` or
+  `sudo mla dashboard token rotate`.
 - Headless installs should use `--dashboard-auth-password-file PATH` with a
   root-readable file or `--dashboard-auth-password-stdin`, not a command-line
   password. `--dashboard-auth-password PASSWORD` is available only as a
   non-recommended lab/automation escape hatch.
-- If an operator is locked out, SSH to the node, rerun the configure script with
-  a new password, or use `--dashboard-disable-auth` only on an isolated trusted
-  network.
-- Set or rotate the machine API token with `--dashboard-generate-api-token` or
-  `--dashboard-api-token-file PATH`; store the resulting token in the fleet
-  orchestrator secret store, not in git.
+- If an operator is locked out, SSH to the node and run the password reset.
+- Store machine tokens in the fleet orchestrator secret store, not in git.
+- The longer configure-script credential flags remain available for headless
+  automation; see `sudo ./configure_mavlink_router.sh --help`.
 
 ## Deferred Hardening
 

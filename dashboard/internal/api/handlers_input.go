@@ -132,10 +132,13 @@ func (s *Server) putInput(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pc.Endpoints = newEps
-	if err := config.WriteConfigAndEnv(s.configPath, s.envPath, pc); err != nil {
+	restarted, err := s.applyRouterMutation(func() error {
+		return config.WriteConfigAndEnv(s.configPath, s.envPath, pc)
+	})
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to write config: "+err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "input updated"})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "input updated", "restarted": restarted})
 }

@@ -4,11 +4,22 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+const testRouterConfig = `[General]
+TcpServerPort=5760
+ReportStats=false
+
+[UartEndpoint uart]
+Device=/dev/serial0
+Baud=57600
+`
 
 const validFleetBaselineJSON = `{
   "baseline": {
@@ -198,5 +209,45 @@ func TestFleetApplyAcceptsConfirmationTokenAlias(t *testing.T) {
 	}
 	if req.Confirmation.ConfirmationToken != "dry-run-token" {
 		t.Fatalf("expected confirmation_token alias to be decoded")
+	}
+}
+
+func TestLocalEndpointMutationCreatesBackupAndUpdatesEnv(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "main.conf")
+	envPath := filepath.Join(dir, "router.env")
+	if err := os.WriteFile(configPath, []byte(testRouterConfig), 0644); err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(configPath, envPath, "test")
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/endpoints", strings.NewReader(`{
+  "name":"qgc","type":"UdpEndpoint","mode":"normal","address":"192.168.1.50","port":14550
+}`))
+	request.RemoteAddr = "127.0.0.1:40000"
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	written, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), "[UdpEndpoint qgc]") {
+		t.Fatalf("endpoint was not written: %s", written)
+	}
+	env, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(env), "192.168.1.50:14550") {
+		t.Fatalf("env was not synchronized: %s", env)
+	}
+	backups, err := filepath.Glob(filepath.Join(dir, "backups", "main-*.conf"))
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("expected one config backup, got %v (%v)", backups, err)
 	}
 }

@@ -1,521 +1,226 @@
-# MAVLink-Anywhere Troubleshooting Guide
+# Troubleshooting
 
-This guide covers common issues and solutions for mavlink-anywhere and mavlink-router.
-
-## Quick Diagnostics
-
-Run these commands to gather diagnostic information:
+Start with these two commands:
 
 ```bash
-# Check overall status
-./mavlink-anywhere status
-
-# Check service logs
-./mavlink-anywhere logs -n 50
-
-# Test serial connection
-./mavlink-anywhere test
-
-# View configuration
-cat /etc/mavlink-router/main.conf
+mla status
+mla logs
 ```
 
----
+Press `Ctrl+C` to leave logs.
 
-## Installation Issues
+## Router is stopped
 
-### Build Fails with "Dependency systemd not found"
-
-**Symptom:**
-```
-meson.build:XX: ERROR: Dependency "systemd" not found
-```
-
-**Cause:** pkg-config cannot find systemd on some Debian versions (Trixie, Bookworm).
-
-**Solution:** The install script automatically handles this by explicitly setting the systemd directory. If you're running an older version, update mavlink-anywhere:
 ```bash
-cd mavlink-anywhere
-git pull
-sudo ./install_mavlink_router.sh
+sudo mla start
+systemctl status mavlink-router --no-pager
 ```
 
----
+Check the config:
 
-### Build Fails with Out of Memory
-
-**Symptom:**
-```
-c++: fatal error: Killed signal terminated program cc1plus
-```
-
-**Cause:** Not enough RAM for compilation (common on Pi Zero).
-
-**Solution:** The install script automatically increases swap to 2GB. If issues persist:
 ```bash
-# Manually increase swap
-sudo dphys-swapfile swapoff
-sudo sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
-sudo dphys-swapfile setup
-sudo dphys-swapfile swapon
-
-# Retry installation
-sudo ./install_mavlink_router.sh
+mla config check
 ```
 
----
+If you recently used raw editing, timestamped backups are beside `/etc/mavlink-router/main.conf`.
 
-### "dphys-swapfile: command not found"
+## No Pixhawk heartbeat
 
-**Cause:** Newer Raspberry Pi OS versions use standard swap instead of dphys-swapfile.
+Check the configured input:
 
-**Solution:** This is normal. The install script automatically detects this and uses the standard swap method instead.
-
----
-
-## Serial/UART Issues
-
-### Device Not Found
-
-**Symptom:**
-```
-UART device not found: /dev/ttyS0
-```
-
-**Solutions:**
-
-1. **Check if UART is enabled:**
-   ```bash
-   ls -la /dev/serial* /dev/tty*
-   ```
-
-2. **Enable UART via raspi-config:**
-   ```bash
-   sudo raspi-config
-   # Interface Options → Serial Port
-   # Login shell: No
-   # Hardware: Yes
-   # Reboot
-   ```
-
-3. **Check boot config:**
-   ```bash
-   grep enable_uart /boot/config.txt  # or /boot/firmware/config.txt
-   ```
-   Should show: `enable_uart=1`
-
----
-
-### Permission Denied
-
-**Symptom:**
-```
-cannot open /dev/ttyS0: Permission denied
-```
-
-**Solution:**
 ```bash
-# Add user to dialout group
-sudo usermod -aG dialout $USER
+mla input show
+ls -l /dev/serial0 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+```
 
-# Log out and back in, or:
-newgrp dialout
+Common causes:
 
-# Verify
+- TX and RX are not crossed.
+- The boards do not share ground.
+- Pixhawk telemetry baud and MLA baud differ.
+- Linux is still using the UART as a serial console.
+- Another process already owns the serial device.
+- The selected device changed after reconnecting a USB adapter.
+
+Check who owns the device:
+
+```bash
+sudo lsof /dev/serial0
+```
+
+Set the correct input, for example:
+
+```bash
+sudo mla input uart /dev/serial0 57600
+```
+
+For Raspberry Pi boot/UART details, see [UART setup](UART-SETUP.md).
+
+## Router says “permission denied” for UART
+
+```bash
+ls -l /dev/serial0
 groups
-# Should include: dialout
 ```
 
----
+Add your normal account to the serial group, then log out and back in:
 
-### Serial Console Blocking UART
-
-**Symptom:** Device exists but mavlink-router fails to get data, or data is corrupted.
-
-**Diagnosis:**
 ```bash
-cat /boot/cmdline.txt  # or /boot/firmware/cmdline.txt
+sudo usermod -aG dialout "$USER"
 ```
-If you see `console=serial0` or `console=ttyS0`, the console is blocking the UART.
 
-**Solution:**
-1. Edit cmdline.txt and remove console=serial0
-2. Or use raspi-config to disable login shell over serial
+The systemd router normally runs with sufficient privileges; a permission error can also mean the service unit was customized.
 
----
+## QGroundControl does not receive data
 
-### No MAVLink Data Received
+List routes:
 
-**Symptoms:**
-- mavlink-router starts but no data
-- `./mavlink-anywhere test` shows no data
-
-**Checklist:**
-
-1. **Check wiring:**
-   - TX and RX must be crossed (FC TX → Pi RX)
-   - Common ground connected
-   - Check voltage levels (3.3V vs 5V)
-
-2. **Check baud rate:**
-   - Must match flight controller setting
-   - Try common rates: 57600, 115200
-
-3. **Check flight controller:**
-   - MAVLink enabled on TELEM port
-   - Correct baud rate set
-   - TELEM port not in GPS mode
-
-4. **Check for serial console:**
-   ```bash
-   ps aux | grep getty
-   ```
-   If you see getty on ttyS0 or ttyAMA0, disable it:
-   ```bash
-   sudo systemctl stop serial-getty@ttyS0.service
-   sudo systemctl disable serial-getty@ttyS0.service
-   ```
-
----
-
-### Wrong UART Device
-
-**Pi 4 with Bluetooth:**
-- `/dev/ttyS0` is the mini UART (less reliable)
-- `/dev/ttyAMA0` is the better PL011 UART (used by Bluetooth)
-
-**Solution:** Disable Bluetooth to free PL011:
 ```bash
-# Add to /boot/config.txt
-dtoverlay=disable-bt
-
-# Reboot
-sudo reboot
+mla endpoint list
 ```
 
----
+For the default `gcs_listen` listener, configure QGroundControl to contact the companion computer's IP on UDP `14550`. QGroundControl must send first; server-mode UDP replies to the most recent sender.
 
-## Service Issues
+For a fixed outbound route instead:
 
-### Service Won't Start
-
-**Symptom:**
-```
-Failed to start MAVLink Router Service.
-```
-
-**Diagnosis:**
 ```bash
-sudo systemctl status mavlink-router
-sudo journalctl -u mavlink-router -n 100
+sudo mla endpoint add qgc GCS_IP 14550
 ```
 
-**Common causes:**
+Replace `GCS_IP` with the actual address. Confirm basic reachability:
 
-1. **Invalid configuration:**
-   ```bash
-   cat /etc/mavlink-router/main.conf
-   # Check for syntax errors
-   ```
-
-2. **Device doesn't exist:**
-   ```bash
-   ls -la /dev/ttyS0  # or your configured device
-   ```
-
-3. **Port already in use:**
-   ```bash
-   sudo lsof -i :5760  # Check TCP port
-   sudo lsof -i :14550 # Check UDP port
-   ```
-   `14550/udp` conflicts only when another local process binds the same address/port.
-   An outbound UDP endpoint that sends to a remote `:14550` is not a local bind conflict.
-
----
-
-### Service Keeps Restarting
-
-**Symptom:** Service starts then stops repeatedly.
-
-**Diagnosis:**
 ```bash
-sudo journalctl -u mavlink-router -f
+ping -c 3 GCS_IP
 ```
 
-**Common causes:**
+Check firewalls on both computers. Do not add both listener and outbound routes to the same GCS unless you understand the duplicate-telemetry risk.
 
-1. **Serial device disconnected or not ready:**
-   - Add delay before starting
-   - Check physical connection
+## Port already in use
 
-2. **Permission issues:**
-   - Check device permissions
-   - Ensure service runs as correct user
-
----
-
-### Service Running But No Data Routing
-
-**Diagnosis:**
 ```bash
-# Check if mavlink-router is receiving data
-sudo journalctl -u mavlink-router -f
-
-# Check UDP ports are listening
-ss -ulpn | grep mavlink
+sudo ss -lntup | grep -E ':(14550|5760|9070)\b'
 ```
 
-**Solutions:**
+Only one server-mode endpoint can bind the same local address and UDP port. `mla config check` detects this in saved config.
 
-1. **Check endpoint configuration:**
-   ```bash
-   cat /etc/mavlink-router/main.conf
-   ```
-   Ensure IP addresses and ports are correct.
+To move a custom listener:
 
-2. **Check firewall:**
-   ```bash
-   sudo ufw status
-   # If active, allow required ports
-   sudo ufw allow 14550/udp
-   sudo ufw allow 14540/udp
-   ```
-
----
-
-## Network Issues
-
-### Can't Connect from QGroundControl
-
-**Quick fix (v3.0.0+):** Your device should have a default server endpoint on port 14550. In QGC, add a UDP connection pointing to `<device-ip>:14550`. This works because QGC sends first, allowing the router to learn the active remote IP:port.
-
-If you need multiple dynamic remote clients at once, prefer the default TCP server on `5760` instead of relying only on UDP server mode.
-
-**Checklist:**
-
-1. **Check the gcs_listen endpoint exists:**
-   ```bash
-   grep -A3 "gcs_listen" /etc/mavlink-router/main.conf
-   ```
-   If missing, re-run: `sudo ./configure_mavlink_router.sh`
-
-2. **Check IP address:**
-   ```bash
-   hostname -I
-   ```
-
-3. **Check mavlink-router is running:**
-   ```bash
-   sudo systemctl status mavlink-router
-   ```
-
-4. **Check firewall:**
-   ```bash
-   sudo ufw status
-   # If active, open port 14550:
-   sudo ufw allow 14550/udp
-   ```
-
-5. **Test connectivity:**
-   ```bash
-   # From QGC machine
-   nc -vzu <PI_IP> 14550
-   ```
-
----
-
-### Data Visible Locally But Not Remotely
-
-**Cause:** Endpoint configured with wrong IP or network issue.
-
-**Solutions:**
-
-1. **Check endpoint IP in config:**
-   ```bash
-   cat /etc/mavlink-router/main.conf
-   ```
-   For remote access, use the Pi's IP (not 127.0.0.1).
-
-2. **Check routing:**
-   ```bash
-   ip route
-   ping <GCS_IP>
-   ```
-
-3. **For VPN connections:**
-   - Verify VPN is connected
-   - Use VPN IP address in endpoint
-
----
-
-## Configuration Issues
-
-### Changes Not Taking Effect
-
-**Solution:** Restart the service after configuration changes:
 ```bash
-sudo systemctl restart mavlink-router
+sudo mla endpoint edit field_listener 0.0.0.0 14600 server
 ```
 
----
+## A route change failed
 
-### Lost Configuration After Reboot
+CLI and dashboard changes create a backup before applying. If restart fails, the previous files are restored automatically.
 
-**Cause:** Configuration wasn't saved properly.
+See recent errors:
 
-**Verification:**
 ```bash
-ls -la /etc/mavlink-router/
-cat /etc/mavlink-router/main.conf
+sudo journalctl -u mavlink-router -n 100 --no-pager
 ```
 
-If files are missing, run configuration again:
+Validate the effective file:
+
 ```bash
-sudo ./configure_mavlink_router.sh
+mla config check
 ```
 
----
+Use safe raw editing only when the route commands cannot represent your advanced setting:
 
-## Performance Issues
-
-### High Latency
-
-**Possible causes:**
-
-1. **Network congestion**
-2. **CPU overload on Pi**
-3. **USB serial adapter issues**
-
-**Solutions:**
-
-1. Check CPU usage:
-   ```bash
-   top
-   ```
-
-2. Use native UART instead of USB:
-   ```bash
-   sudo ./configure_mavlink_router.sh --uart /dev/ttyS0
-   ```
-
-3. Reduce number of endpoints
-
----
-
-### Data Loss or Corruption
-
-**Possible causes:**
-
-1. **Baud rate mismatch**
-2. **Mini UART instability**
-3. **Poor wiring**
-
-**Solutions:**
-
-1. Use PL011 UART (disable Bluetooth)
-2. Check physical connections
-3. Use shielded cables for long runs
-4. Lower baud rate if needed
-
----
-
-## Dashboard Issues
-
-### Dashboard Not Accessible
-
-**Symptom:** The dashboard doesn't load where you expect it to.
-
-**Diagnosis:**
 ```bash
-# Check if dashboard service is running
-sudo systemctl status mavlink-anywhere-dashboard
-
-# Check what port it's listening on
-ss -tlnp | grep 9070
-
-# View dashboard logs
-sudo journalctl -u mavlink-anywhere-dashboard -n 50
+sudo mla config edit
 ```
 
-**Solutions:**
+## Dashboard is unreachable
 
-1. **Service not installed:**
-   ```bash
-   sudo ./configure_mavlink_router.sh --install-dashboard
-   ```
-
-2. **Binary not downloaded (no internet during setup):**
-   ```bash
-   sudo ./configure_mavlink_router.sh --install-dashboard
-   ```
-
-3. **Firewall blocking port 9070:**
-   ```bash
-   sudo ufw allow 9070/tcp
-   ```
-
-4. **Dashboard binds to localhost only (default):**
-   Access via SSH tunnel:
-   ```bash
-   ssh -L 9070:localhost:9070 user@<device-ip>
-   # Then open http://localhost:9070 in browser
-   ```
-
-5. **Dashboard was never exposed on the network:**
-   ```bash
-   sudo ./configure_mavlink_router.sh --install-dashboard \
-       --dashboard-listen 0.0.0.0:9070
-   ```
-
-### Dashboard Shows Stale Data
-
-**Cause:** Config file was edited externally while dashboard is running.
-
-**Solution:** The dashboard re-reads the config on every API call, so refresh the browser page. If still stale, restart the dashboard:
 ```bash
-sudo systemctl restart mavlink-anywhere-dashboard
+mla dashboard status
+sudo systemctl status mavlink-anywhere-dashboard --no-pager
 ```
 
-### Dashboard Uses Too Much Memory
+If status says `local only`, use an SSH tunnel or intentionally expose it:
 
-**Solution:** The systemd service has `MemoryMax=30M`. If issues persist on Pi Zero:
 ```bash
-# Disable dashboard
-sudo systemctl stop mavlink-anywhere-dashboard
-sudo systemctl disable mavlink-anywhere-dashboard
+ssh -L 9070:127.0.0.1:9070 pi@PI_IP
 ```
 
----
+or:
 
-## Getting Help
+```bash
+sudo mla dashboard expose
+```
 
-If issues persist:
+Reverse network exposure with:
 
-1. **Gather diagnostics:**
-   ```bash
-   ./mavlink-anywhere status
-   ./mavlink-anywhere logs -n 100 > mavlink_logs.txt
-   cat /etc/mavlink-router/main.conf
-   uname -a
-   cat /etc/os-release
-   ```
+```bash
+sudo mla dashboard hide
+```
 
-2. **Check existing issues:**
-   https://github.com/alireza787b/mavlink-anywhere/issues
+## Dashboard password does not work
 
-3. **Open new issue** with:
-   - Raspberry Pi model
-   - OS version
-   - mavlink-anywhere version
-   - Configuration used
-   - Error messages
-   - Steps to reproduce
+Reset it:
 
----
+```bash
+sudo mla dashboard password reset
+```
 
-## See Also
+Then use a private browser window to avoid cached Basic Auth credentials.
 
-- [DASHBOARD.md](DASHBOARD.md) - Web dashboard setup and API reference
-- [UART-SETUP.md](UART-SETUP.md) - Serial port configuration
-- [CLI-REFERENCE.md](CLI-REFERENCE.md) - Command reference
-- [Main README](../README.md) - Project overview
+Dashboard logs:
+
+```bash
+sudo journalctl -u mavlink-anywhere-dashboard -n 100 --no-pager
+```
+
+## API token does not work
+
+```bash
+mla dashboard token status
+```
+
+Rotate it and update the client:
+
+```bash
+sudo mla dashboard token rotate
+```
+
+The token goes in either of these request headers:
+
+```text
+Authorization: Bearer TOKEN
+X-Mavlink-Anywhere-Token: TOKEN
+```
+
+Browser passwords and machine tokens are different credentials.
+
+## Dashboard update failed
+
+```bash
+cd ~/mavlink-anywhere
+git pull --ff-only
+sudo ./configure_mavlink_router.sh --install-dashboard --debug
+```
+
+The router is independent and should keep running if the optional dashboard download or build fails.
+
+Check architecture:
+
+```bash
+uname -m
+```
+
+Published Linux assets support arm6, arm64, and amd64.
+
+## Collect useful diagnostics
+
+These commands do not print the dashboard token or password hash:
+
+```bash
+mla status
+mla config check
+systemctl status mavlink-router --no-pager
+sudo journalctl -u mavlink-router -n 100 --no-pager
+uname -a
+```
+
+Before sharing raw files, remove public IPs, VPN addresses, hostnames, and any contents of `/etc/mavlink-anywhere/dashboard.env`.

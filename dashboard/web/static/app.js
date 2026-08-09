@@ -247,10 +247,11 @@ function dashboard() {
 
         // Raw config save
         async saveRawConfig() {
+            if (!confirm('Save this raw configuration? A backup will be created and a running router will restart.')) return;
             this.loading.config = true;
             try {
-                await this.api('PUT', '/config', { raw: this.rawConfig });
-                this.toast('success', 'Config saved');
+                const result = await this.api('PUT', '/config', { raw: this.rawConfig });
+                this.toast('success', result.restarted ? 'Config saved and router restarted' : 'Config saved');
                 await this.loadEndpoints();
                 await this.loadInput();
                 await this.loadDiagnostics();
@@ -264,8 +265,8 @@ function dashboard() {
         // Endpoint CRUD
         async toggleEp(ep) {
             try {
-                await this.api('PATCH', `/endpoints/${ep.name}`, { enabled: !ep.enabled });
-                this.toast('info', `${ep.name} ${ep.enabled ? 'disabled' : 'enabled'}`);
+                const result = await this.api('PATCH', `/endpoints/${ep.name}`, { enabled: !ep.enabled });
+                this.toast('info', `${ep.name} ${ep.enabled ? 'disabled' : 'enabled'}${result.restarted ? ' · router restarted' : ''}`);
                 await this.loadEndpoints();
                 await this.loadConfig();
             } catch (e) {
@@ -276,8 +277,8 @@ function dashboard() {
         async deleteEp(ep) {
             if (!confirm(`Delete endpoint "${ep.name}"? This will modify the config file.`)) return;
             try {
-                await this.api('DELETE', `/endpoints/${ep.name}`);
-                this.toast('success', `${ep.name} deleted`);
+                const result = await this.api('DELETE', `/endpoints/${ep.name}`);
+                this.toast('success', `${ep.name} deleted${result.restarted ? ' · router restarted' : ''}`);
                 await this.loadEndpoints();
                 await this.loadConfig();
                 await this.loadInput();
@@ -298,14 +299,14 @@ function dashboard() {
         async saveEdit() {
             this.loading.edit = true;
             try {
-                await this.api('PUT', `/endpoints/${this.editingEp.name}`, {
+                const result = await this.api('PUT', `/endpoints/${this.editingEp.name}`, {
                     name: this.editingEp.name,
                     address: this.editAddr,
                     port: this.editPort,
                     mode: this.editMode,
                     enabled: true,
                 });
-                this.toast('success', `${this.editingEp.name} updated`);
+                this.toast('success', `${this.editingEp.name} updated${result.restarted ? ' · router restarted' : ''}`);
                 this.showEditModal = false;
                 await this.loadEndpoints();
                 await this.loadConfig();
@@ -326,26 +327,21 @@ function dashboard() {
             const mode = this.wizardMode || this.selectedTemplate?.mode || 'normal';
 
             try {
-                await this.api('POST', '/endpoints', {
+                const result = await this.api('POST', '/endpoints', {
                     name: name,
                     type: 'UdpEndpoint',
                     mode: mode,
                     address: addr,
                     port: port,
                 });
-                this.toast('success', `Endpoint "${name}" added`);
+                this.toast('success', `Endpoint "${name}" added${result.restarted ? ' · router restarted' : ''}`);
                 this.resetWizard();
                 this.showAddWizard = false;
                 await this.loadEndpoints();
                 await this.loadConfig();
                 await this.loadDiagnostics();
 
-                // Restart service to apply
-                try {
-                    await this.api('POST', '/service/restart');
-                    this.toast('info', 'Service restarted to apply changes');
-                    setTimeout(() => this.loadStatus(), 2000);
-                } catch (e) { /* best effort */ }
+                setTimeout(() => this.loadStatus(), 1500);
             } catch (e) {
                 this.toast('error', e.message);
             } finally {

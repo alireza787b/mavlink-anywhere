@@ -49,12 +49,13 @@ func ParseConfigText(raw string, modifiedAt time.Time) (*ParsedConfig, error) {
 		ModifiedAt: modifiedAt,
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(raw))
+	scanner := bufio.NewScanner(strings.NewReader(expandDisabledEndpoints(raw)))
 
 	var currentSection string
 	var currentName string
 	var currentType string
 	props := map[string]string{}
+	generalSections := 0
 
 	flushEndpoint := func() {
 		if currentType == "" || currentName == "" {
@@ -68,6 +69,10 @@ func ParseConfigText(raw string, modifiedAt time.Time) (*ParsedConfig, error) {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
+		}
+
+		if strings.HasPrefix(line, "[") && !strings.HasSuffix(line, "]") {
+			return nil, fmt.Errorf("malformed section header: %s", line)
 		}
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
@@ -88,21 +93,24 @@ func ParseConfigText(raw string, modifiedAt time.Time) (*ParsedConfig, error) {
 
 			switch {
 			case currentSection == "General":
-				// handled below
+				generalSections++
+				if generalSections > 1 {
+					return nil, fmt.Errorf("duplicate [General] section")
+				}
 			case strings.HasPrefix(currentSection, "UdpEndpoint"):
 				currentType = "UdpEndpoint"
 				if currentName == "" {
-					currentName = currentSection
+					return nil, fmt.Errorf("UdpEndpoint section requires a name")
 				}
 			case strings.HasPrefix(currentSection, "UartEndpoint"):
 				currentType = "UartEndpoint"
 				if currentName == "" {
-					currentName = currentSection
+					return nil, fmt.Errorf("UartEndpoint section requires a name")
 				}
 			case strings.HasPrefix(currentSection, "TcpEndpoint"):
 				currentType = "TcpEndpoint"
 				if currentName == "" {
-					currentName = currentSection
+					return nil, fmt.Errorf("TcpEndpoint section requires a name")
 				}
 			}
 			continue
@@ -111,6 +119,9 @@ func ParseConfigText(raw string, modifiedAt time.Time) (*ParsedConfig, error) {
 		// Key=Value
 		eqIdx := strings.IndexByte(line, '=')
 		if eqIdx < 0 {
+			if currentSection == "General" || currentType != "" {
+				return nil, fmt.Errorf("invalid setting line: %s", line)
+			}
 			continue
 		}
 		key := strings.TrimSpace(line[:eqIdx])
@@ -132,15 +143,58 @@ func ParseConfigText(raw string, modifiedAt time.Time) (*ParsedConfig, error) {
 
 	// Flush last section
 	flushEndpoint()
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan config: %w", err)
+	}
+	if generalSections != 1 {
+		return nil, fmt.Errorf("config must contain exactly one [General] section")
+	}
 
 	return pc, nil
+}
+
+const (
+	disabledBegin = "# MAVLINK_ANYWHERE_DISABLED_BEGIN "
+	disabledEnd   = "# MAVLINK_ANYWHERE_DISABLED_END "
+)
+
+// expandDisabledEndpoints turns dashboard-managed commented blocks into normal
+// parser input with a private Enabled marker. mavlink-router itself continues
+// to ignore the commented block.
+func expandDisabledEndpoints(raw string) string {
+	var b strings.Builder
+	inDisabled := false
+	for _, line := range strings.SplitAfter(raw, "\n") {
+		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "\n"))
+		if strings.HasPrefix(trimmed, disabledBegin) {
+			inDisabled = true
+			continue
+		}
+		if strings.HasPrefix(trimmed, disabledEnd) {
+			inDisabled = false
+			continue
+		}
+		if inDisabled {
+			uncommented := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "#"))
+			if strings.HasPrefix(uncommented, "[") {
+				b.WriteString(uncommented)
+				b.WriteString("\nMavlinkAnywhereEnabled=false\n")
+			} else if uncommented != "" {
+				b.WriteString(uncommented)
+				b.WriteByte('\n')
+			}
+			continue
+		}
+		b.WriteString(line)
+	}
+	return b.String()
 }
 
 func buildEndpoint(epType, name string, props map[string]string) endpoints.Endpoint {
 	ep := endpoints.Endpoint{
 		Name:    name,
 		Type:    epType,
-		Enabled: true,
+		Enabled: !strings.EqualFold(props["MavlinkAnywhereEnabled"], "false"),
 	}
 
 	switch epType {
@@ -189,28 +243,34 @@ func WriteConfigFile(path string, pc *ParsedConfig) error {
 	// Endpoints
 	for _, ep := range pc.Endpoints {
 		if !ep.Enabled {
-			b.WriteString(fmt.Sprintf("# Disabled: %s\n", ep.Name))
+			b.WriteString(disabledBegin + ep.Name + "\n")
+			for _, line := range strings.Split(strings.TrimSuffix(formatEndpoint(ep), "\n"), "\n") {
+				if line == "" {
+					b.WriteString("#\n")
+				} else {
+					b.WriteString("# " + line + "\n")
+				}
+			}
+			b.WriteString(disabledEnd + ep.Name + "\n\n")
 			continue
 		}
-		switch ep.Type {
-		case "UartEndpoint":
-			b.WriteString(fmt.Sprintf("[UartEndpoint %s]\n", ep.Name))
-			b.WriteString(fmt.Sprintf("Device=%s\n", ep.Device))
-			b.WriteString(fmt.Sprintf("Baud=%d\n", ep.Baud))
-		case "UdpEndpoint":
-			b.WriteString(fmt.Sprintf("[UdpEndpoint %s]\n", ep.Name))
-			b.WriteString(fmt.Sprintf("Mode=%s\n", ep.Mode))
-			b.WriteString(fmt.Sprintf("Address=%s\n", ep.Address))
-			b.WriteString(fmt.Sprintf("Port=%d\n", ep.Port))
-		case "TcpEndpoint":
-			b.WriteString(fmt.Sprintf("[TcpEndpoint %s]\n", ep.Name))
-			b.WriteString(fmt.Sprintf("Address=%s\n", ep.Address))
-			b.WriteString(fmt.Sprintf("Port=%d\n", ep.Port))
-		}
-		b.WriteString("\n")
+		b.WriteString(formatEndpoint(ep))
 	}
 
 	return os.WriteFile(path, []byte(b.String()), 0644)
+}
+
+func formatEndpoint(ep endpoints.Endpoint) string {
+	var b strings.Builder
+	switch ep.Type {
+	case "UartEndpoint":
+		b.WriteString(fmt.Sprintf("[UartEndpoint %s]\nDevice=%s\nBaud=%d\n\n", ep.Name, ep.Device, ep.Baud))
+	case "UdpEndpoint":
+		b.WriteString(fmt.Sprintf("[UdpEndpoint %s]\nMode=%s\nAddress=%s\nPort=%d\n\n", ep.Name, ep.Mode, ep.Address, ep.Port))
+	case "TcpEndpoint":
+		b.WriteString(fmt.Sprintf("[TcpEndpoint %s]\nAddress=%s\nPort=%d\n\n", ep.Name, ep.Address, ep.Port))
+	}
+	return b.String()
 }
 
 // WriteConfigAndEnv writes the config file and regenerates the companion env file.
@@ -261,7 +321,26 @@ func WriteRawConfig(configPath, envPath, raw string) error {
 	if err != nil {
 		return err
 	}
-	return WriteConfigAndEnv(configPath, envPath, pc)
+	if err := ValidateParsedConfig(pc); err != nil {
+		return err
+	}
+	oldConfig, hadConfig, err := readOptionalFile(configPath)
+	if err != nil {
+		return err
+	}
+	oldEnv, hadEnv, err := readOptionalFile(envPath)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(configPath, []byte(raw), 0644); err != nil {
+		return err
+	}
+	if err := WriteEnvFile(envPath, EnvFromConfig(pc)); err != nil {
+		_ = restoreOptionalFile(configPath, oldConfig, hadConfig)
+		_ = restoreOptionalFile(envPath, oldEnv, hadEnv)
+		return err
+	}
+	return nil
 }
 
 // ConfigModTime returns the modification time of the config file.
@@ -291,8 +370,8 @@ func AddEndpoint(path string, ep endpoints.Endpoint) error {
 	}
 
 	ep.Enabled = true
-	pc.Endpoints = append(pc.Endpoints, ep)
-	return WriteConfigFile(path, pc)
+	updated := strings.TrimRight(pc.Raw, "\r\n") + "\n\n" + formatEndpoint(ep)
+	return writeValidatedRawConfig(path, updated)
 }
 
 // UpdateEndpoint replaces an endpoint by name.
@@ -303,6 +382,7 @@ func UpdateEndpoint(path string, name string, ep endpoints.Endpoint) error {
 	}
 
 	found := false
+	enabled := true
 	for i, existing := range pc.Endpoints {
 		if existing.Name == name {
 			ep.Type = existing.Type
@@ -312,6 +392,8 @@ func UpdateEndpoint(path string, name string, ep endpoints.Endpoint) error {
 			if err := ValidateEndpointTopology(pc.Endpoints, ep, name); err != nil {
 				return err
 			}
+			enabled = existing.Enabled
+			ep.Enabled = enabled
 			pc.Endpoints[i] = ep
 			found = true
 			break
@@ -321,7 +403,15 @@ func UpdateEndpoint(path string, name string, ep endpoints.Endpoint) error {
 		return fmt.Errorf("endpoint %q not found", name)
 	}
 
-	return WriteConfigFile(path, pc)
+	rangeInfo, err := findRawEndpointRange(pc.Raw, name)
+	if err != nil {
+		return err
+	}
+	replacement := formatEndpoint(ep)
+	if !enabled {
+		replacement = formatDisabledEndpoint(ep)
+	}
+	return writeValidatedRawConfig(path, replaceRawRange(pc.Raw, rangeInfo, replacement))
 }
 
 // DeleteEndpoint removes an endpoint by name.
@@ -331,21 +421,21 @@ func DeleteEndpoint(path, name string) error {
 		return err
 	}
 
-	newEps := make([]endpoints.Endpoint, 0, len(pc.Endpoints))
 	found := false
 	for _, ep := range pc.Endpoints {
 		if ep.Name == name {
 			found = true
-			continue
 		}
-		newEps = append(newEps, ep)
 	}
 	if !found {
 		return fmt.Errorf("endpoint %q not found", name)
 	}
 
-	pc.Endpoints = newEps
-	return WriteConfigFile(path, pc)
+	rangeInfo, err := findRawEndpointRange(pc.Raw, name)
+	if err != nil {
+		return err
+	}
+	return writeValidatedRawConfig(path, replaceRawRange(pc.Raw, rangeInfo, ""))
 }
 
 // ToggleEndpoint enables or disables an endpoint by name.
@@ -356,9 +446,14 @@ func ToggleEndpoint(path, name string, enabled bool) error {
 	}
 
 	found := false
+	var target endpoints.Endpoint
 	for i, ep := range pc.Endpoints {
 		if ep.Name == name {
+			if ep.Enabled == enabled {
+				return nil
+			}
 			pc.Endpoints[i].Enabled = enabled
+			target = pc.Endpoints[i]
 			found = true
 			break
 		}
@@ -367,5 +462,89 @@ func ToggleEndpoint(path, name string, enabled bool) error {
 		return fmt.Errorf("endpoint %q not found", name)
 	}
 
-	return WriteConfigFile(path, pc)
+	rangeInfo, err := findRawEndpointRange(pc.Raw, name)
+	if err != nil {
+		return err
+	}
+	replacement := formatEndpoint(target)
+	if !enabled {
+		replacement = formatDisabledEndpoint(target)
+	}
+	return writeValidatedRawConfig(path, replaceRawRange(pc.Raw, rangeInfo, replacement))
+}
+
+type rawEndpointRange struct {
+	start int
+	end   int
+}
+
+func findRawEndpointRange(raw, name string) (rawEndpointRange, error) {
+	lines := strings.SplitAfter(raw, "\n")
+	offset := 0
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == disabledBegin+name {
+			start := offset
+			end := offset + len(line)
+			for _, candidate := range lines[i+1:] {
+				end += len(candidate)
+				if strings.TrimSpace(candidate) == disabledEnd+name {
+					return rawEndpointRange{start: start, end: end}, nil
+				}
+			}
+			return rawEndpointRange{}, fmt.Errorf("disabled endpoint %q has no end marker", name)
+		}
+
+		section := strings.TrimSuffix(strings.TrimPrefix(trimmed, "["), "]")
+		parts := strings.SplitN(section, " ", 2)
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") && len(parts) == 2 &&
+			(parts[0] == "UdpEndpoint" || parts[0] == "UartEndpoint" || parts[0] == "TcpEndpoint") &&
+			strings.TrimSpace(parts[1]) == name {
+			start := offset
+			end := offset + len(line)
+			scanOffset := end
+			for _, candidate := range lines[i+1:] {
+				candidateTrimmed := strings.TrimSpace(candidate)
+				if strings.HasPrefix(candidateTrimmed, "[") || strings.HasPrefix(candidateTrimmed, disabledBegin) {
+					break
+				}
+				if candidateTrimmed != "" && !strings.HasPrefix(candidateTrimmed, "#") && !strings.HasPrefix(candidateTrimmed, ";") {
+					end = scanOffset + len(candidate)
+				}
+				scanOffset += len(candidate)
+			}
+			return rawEndpointRange{start: start, end: end}, nil
+		}
+		offset += len(line)
+	}
+	return rawEndpointRange{}, fmt.Errorf("endpoint %q not found in raw config", name)
+}
+
+func replaceRawRange(raw string, target rawEndpointRange, replacement string) string {
+	return raw[:target.start] + replacement + raw[target.end:]
+}
+
+func formatDisabledEndpoint(ep endpoints.Endpoint) string {
+	var b strings.Builder
+	b.WriteString(disabledBegin + ep.Name + "\n")
+	for _, line := range strings.Split(strings.TrimSuffix(formatEndpoint(ep), "\n"), "\n") {
+		if line == "" {
+			b.WriteString("#\n")
+		} else {
+			b.WriteString("# " + line + "\n")
+		}
+	}
+	b.WriteString(disabledEnd + ep.Name + "\n\n")
+	return b.String()
+}
+
+func writeValidatedRawConfig(path, raw string) error {
+	pc, err := ParseConfigText(raw, time.Now())
+	if err != nil {
+		return err
+	}
+	if err := ValidateParsedConfig(pc); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(raw), 0644)
 }

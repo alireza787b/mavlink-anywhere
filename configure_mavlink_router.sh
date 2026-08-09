@@ -2,7 +2,7 @@
 # =============================================================================
 # MAVLink-Anywhere: Mavlink-router Configuration Script
 # =============================================================================
-# Version: 3.0.14
+# Version: 3.1.0
 # Author: Alireza Ghaderi
 # GitHub: https://github.com/alireza787b/mavlink-anywhere
 # =============================================================================
@@ -133,9 +133,11 @@ DASHBOARD_UFW_RULE=false
 
 show_help() {
     cat <<EOF
-MAVLink-Anywhere Configuration Script v3.0.14
+MAVLink-Anywhere Configuration Script v3.1.0
 
 Usage: sudo ./configure_mavlink_router.sh [OPTIONS]
+
+For everyday route, input, dashboard, password and token commands: mla help
 
 Modes:
   (default)         Interactive mode - checks prerequisites, prompts for settings
@@ -360,10 +362,27 @@ if [[ "$SHOW_HELP" == "true" ]]; then
     exit 0
 fi
 
+install_operator_command() {
+    if [[ $EUID -ne 0 ]]; then
+        return 0
+    fi
+    if [[ ! -f "${SCRIPT_DIR}/mavlink-router-cli.sh" || ! -f "${SCRIPT_DIR}/scripts/mavlink_config.py" ]]; then
+        return 0
+    fi
+    install -d -m 755 /usr/local/lib/mavlink-anywhere/scripts /usr/local/lib/mavlink-anywhere/lib
+    install -m 755 "${SCRIPT_DIR}/mavlink-router-cli.sh" /usr/local/lib/mavlink-anywhere/mla
+    install -m 755 "${SCRIPT_DIR}/scripts/mavlink_config.py" /usr/local/lib/mavlink-anywhere/scripts/mavlink_config.py
+    install -m 644 "${SCRIPT_DIR}/lib/common.sh" /usr/local/lib/mavlink-anywhere/lib/common.sh
+    ln -sfn /usr/local/lib/mavlink-anywhere/mla /usr/local/bin/mla
+    echo "Operator command installed: mla"
+}
+
+install_operator_command
+
 # Handle --install-dashboard (standalone: install/update dashboard only)
 if [[ "$INSTALL_DASHBOARD_ONLY" == "true" ]]; then
     if [[ "$LIBS_LOADED" == "true" ]] && type install_dashboard &>/dev/null; then
-        install_dashboard "${DASHBOARD_LISTEN:-127.0.0.1:9070}"
+        install_dashboard "${DASHBOARD_LISTEN:-$(dashboard_current_listen)}"
     else
         echo "Dashboard library not available. Ensure lib/dashboard.sh exists."
         exit 1
@@ -1072,10 +1091,10 @@ EOF
     echo "    sudo systemctl restart mavlink-router"
     echo ""
     if [[ -f "${SCRIPT_DIR}/mavlink-router-cli.sh" ]]; then
-    echo "  CLI Helper (all-in-one):"
-    echo "    ./mavlink-router-cli.sh status"
-    echo "    ./mavlink-router-cli.sh logs"
-    echo "    ./mavlink-router-cli.sh endpoints"
+    echo "  Operator command:"
+    echo "    mla status"
+    echo "    mla help endpoint"
+    echo "    mla help dashboard"
     echo ""
     fi
     echo "================================================================="
@@ -1092,6 +1111,6 @@ fi
 
 if [[ "$SKIP_DASHBOARD" != "true" ]] && [[ "$INSTALL_DASHBOARD_ONLY" != "true" ]]; then
     if [[ "$LIBS_LOADED" == "true" ]] && type install_dashboard &>/dev/null; then
-        install_dashboard "${DASHBOARD_LISTEN:-127.0.0.1:9070}" || true  # Non-fatal: dashboard is optional
+        install_dashboard "${DASHBOARD_LISTEN:-$(dashboard_current_listen)}" || true  # Non-fatal: dashboard is optional
     fi
 fi

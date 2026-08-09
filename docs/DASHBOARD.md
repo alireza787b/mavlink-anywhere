@@ -1,453 +1,203 @@
-# MAVLink-Anywhere Web Dashboard
+# Dashboard and authentication
 
-The web dashboard provides a browser-based interface for monitoring and managing mavlink-router — no SSH or terminal knowledge required.
+The dashboard shows router health and manages MAVLink routes from a browser. It is optional; `mavlink-router` keeps working when the dashboard is off.
 
-## Quick Access
+## Safest access: local or SSH tunnel
 
-After running `configure_mavlink_router.sh`, the dashboard is automatically installed and bound to localhost by default:
+The default address is:
 
-```
+```text
 http://127.0.0.1:9070
 ```
 
-For network access, expose it explicitly:
+From another computer, create an SSH tunnel:
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070
+ssh -L 9070:127.0.0.1:9070 pi@PI_IP
 ```
 
-## Features
+Keep that terminal open and visit `http://127.0.0.1:9070` on your computer.
 
-- **Service Status** — See if mavlink-router is running, uptime, and version at a glance
-- **Routing View** — Input source is separated from listener and output routes
-- **Endpoint Management** — View, add, edit, delete, and toggle MAVLink endpoints
-- **MAVLink Health** — Passive runtime probe of the routed stream (bytes, packets, heartbeat, system IDs)
-- **Warnings & Guidance** — Detect missing input, firewall issues, duplicate server binds, and mixed routing patterns
-- **Guided Add Wizard** — Step-by-step wizard for adding new endpoints (GCS, local services, VPN)
-- **Live Logs** — Real-time streaming of mavlink-router logs via SSE
-- **Service Control** — Start, stop, restart mavlink-router from the browser
-- **System Info** — Board detection, UART status, firewall info, RAM usage
-- **Routing Profiles** — Export the current effective routing profile, preview an import, apply with backup, and restore the last good backup
-- **Raw Config Editor** — Advanced users can edit the INI config directly
-- **Default Server Endpoint** — Port 14550 listens for any GCS connection out of the box
-- **Source Visibility** — The active MAVLink source is shown separately from output endpoints
-
-## Architecture
-
-The dashboard is a single static Go binary (~7MB) with the web UI embedded. It:
-
-- Reads/writes the same `/etc/mavlink-router/main.conf` as CLI scripts
-- Uses systemctl for service control
-- Streams logs via `journalctl`
-- Runs as a separate systemd service (`mavlink-anywhere-dashboard`)
-- Uses <20MB RAM (hard-capped at 30MB via systemd MemoryMax)
-- Works without Node/npm at runtime
-
-## Installation
-
-### Automatic (default)
-
-The dashboard is installed automatically when you run:
+## Expose on a trusted network
 
 ```bash
-sudo ./configure_mavlink_router.sh
+sudo mla dashboard expose
 ```
 
-### Skip Dashboard
+This binds the dashboard to all network interfaces on port `9070`. If there is no browser password, MLA creates one and prints it once.
+
+Check the saved state:
 
 ```bash
-sudo ./configure_mavlink_router.sh --skip-dashboard
+mla dashboard status
 ```
 
-### Install/Update Dashboard Only
+Do not expose port `9070` directly to the public internet. Use a VPN, SSH tunnel, and firewall.
+
+## Revert exposure
+
+Return to localhost-only access:
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard
+sudo mla dashboard hide
 ```
 
-### Install/Update Dashboard and Expose on Network
+This is the normal way to undo `dashboard expose`. It does not stop MAVLink routing.
+
+To stop the UI completely:
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070
+sudo mla dashboard off
 ```
 
-On supported release architectures (`arm6`, `arm64`, `amd64`), the installer downloads a prebuilt binary. If that download is unavailable and `go` is installed locally, the installer falls back to a local source build. If neither path succeeds, mavlink-router still installs and the dashboard is skipped. Minimal hosts do not need the external `file(1)` package for the download validation step.
-
-### Manual
-
-Download the binary for your architecture from [GitHub Releases](https://github.com/alireza787b/mavlink-anywhere/releases):
+Start it again:
 
 ```bash
-# Raspberry Pi Zero/W (armv6)
-curl -fsSL https://github.com/alireza787b/mavlink-anywhere/releases/latest/download/mavlink-anywhere-linux-arm6 \
-  -o /opt/mavlink-anywhere/mavlink-anywhere
-chmod +x /opt/mavlink-anywhere/mavlink-anywhere
-
-# Raspberry Pi 3/4/5, Jetson (arm64)
-curl -fsSL https://github.com/alireza787b/mavlink-anywhere/releases/latest/download/mavlink-anywhere-linux-arm64 \
-  -o /opt/mavlink-anywhere/mavlink-anywhere
-chmod +x /opt/mavlink-anywhere/mavlink-anywhere
-
-# x86_64
-curl -fsSL https://github.com/alireza787b/mavlink-anywhere/releases/latest/download/mavlink-anywhere-linux-amd64 \
-  -o /opt/mavlink-anywhere/mavlink-anywhere
-chmod +x /opt/mavlink-anywhere/mavlink-anywhere
+sudo mla dashboard on
 ```
 
-Then start manually:
+Important: `on` uses the last saved address. Run `hide` before `off` when you want the next start to remain local-only.
+
+## Reset the browser password
+
+Choose your own password:
 
 ```bash
-./mavlink-anywhere --listen 127.0.0.1:9070
+sudo mla dashboard password reset
 ```
 
-### Manual Source Build
-
-If your architecture does not have a published release asset, build the dashboard directly:
+The default username is `admin`. To change it while resetting:
 
 ```bash
-cd dashboard
-CGO_ENABLED=0 go build -o ../mavlink-anywhere ./cmd/
-sudo install -m 755 ../mavlink-anywhere /opt/mavlink-anywhere/mavlink-anywhere
+sudo mla dashboard password reset operator
 ```
 
-## Systemd Service
-
-The dashboard runs as `mavlink-anywhere-dashboard.service`:
+Generate a random password instead:
 
 ```bash
-# Status
-sudo systemctl status mavlink-anywhere-dashboard
-
-# Restart
-sudo systemctl restart mavlink-anywhere-dashboard
-
-# Stop (does NOT affect mavlink-router)
-sudo systemctl stop mavlink-anywhere-dashboard
-
-# Disable at boot
-sudo systemctl disable mavlink-anywhere-dashboard
+sudo mla dashboard password generate
 ```
 
-## Security
+Only the bcrypt password hash is stored in `/etc/mavlink-anywhere/dashboard.env`.
 
-| Access | Auth Required | Rationale |
-|--------|--------------|-----------|
-| `127.0.0.1:9070` (default) | None | Same trust level as SSH |
-| `0.0.0.0:9070` (explicit) | Browser Basic Auth for dashboard users; `MAVLINK_ANYWHERE_API_TOKEN` for machine mutations | Use only on a VPN/trusted admin network |
-| open lab mode | None | Isolated lab/demo networks only |
-| no dashboard | None | Terminal-only or hardened hosts |
+## Machine API token
 
-The dashboard binds to `127.0.0.1` by default; it is only accessible from the
-device itself or via SSH tunnel. Before exposing it on a network, configure
-browser auth, set `MAVLINK_ANYWHERE_API_TOKEN` for machine clients, restrict
-access with firewall/VPN policy, and understand that read-only API responses may
-reveal routing topology and system metadata. To expose it explicitly:
+Browser users sign in with the username and password. Programs such as MDS Fleet Ops use a bearer token for remote changes.
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070
+sudo mla dashboard token create
+sudo mla dashboard token rotate
+sudo mla dashboard token remove
 ```
 
-If no dashboard auth exists yet, the configure script generates a browser
-password and prints it once. The default generated username is `admin`. To
-provide a known credential without putting it in shell history, use a
-root-readable password file:
+Save the value printed by `create` or `rotate`. MLA status does not reveal it later.
+
+Example API call:
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-auth-user operator \
-  --dashboard-auth-password-file /root/mavlink-dashboard-password
-```
-
-For interactive setup or password rotation, use:
-
-```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-auth-user operator \
-  --dashboard-auth-prompt
-```
-
-Headless password options:
-
-```bash
-printf '%s' "$MAVLINK_DASHBOARD_PASSWORD" | sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-auth-user operator \
-  --dashboard-auth-password-stdin
-```
-
-`--dashboard-auth-password PASSWORD` is available for constrained lab
-automation, but it is not recommended because command-line arguments can leak
-through shell history and process listings.
-
-Firewall:
-
-- The configure script changes UFW only when `--dashboard-ufw-rule` or
-  `--ufw-rule` is supplied.
-- If UFW is active and the dashboard is remote, the flag allows the dashboard
-  TCP port.
-- Without the flag, run `sudo ufw allow 9070/tcp` yourself.
-
-Configure a machine API token without putting it in shell history:
-
-```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-api-token-file /root/mavlink-api-token
-```
-
-Generate one and print it once:
-
-```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-generate-api-token
-```
-
-Open lab mode intentionally disables browser login and bearer-token enforcement
-for remote mutations:
-
-```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070 \
-  --dashboard-open-lab-mode
-```
-
-Use open lab mode only on isolated local test networks. Runtime ignores the
-open-lab bypass if dashboard auth or `MAVLINK_ANYWHERE_API_TOKEN` is also
-configured.
-
-Debug API calls:
-
-```bash
-curl -u operator http://node.example:9070/api/v1/status
-curl -u operator -H 'X-Sidecar-CSRF: 1' \
-  -H 'Content-Type: application/json' \
-  -X POST http://node.example:9070/api/v1/service/restart
 curl -H "Authorization: Bearer $MAVLINK_ANYWHERE_API_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -X POST http://node.example:9070/api/v1/profiles/validate \
-  --data @fleet-mavlink.json
+  http://PI_IP:9070/api/v1/status
 ```
 
-The MAVLink Anywhere dashboard is a Go static/API server, not FastAPI. The GCS
-FastAPI/OpenAPI docs are separate from this sidecar dashboard.
+Browser changes send a CSRF header automatically. A direct mutating API call also needs it when using browser Basic Auth:
 
-## GCS Server Endpoint (Port 14550)
+```bash
+curl -u operator \
+  -H 'X-Sidecar-CSRF: 1' \
+  -X POST http://PI_IP:9070/api/v1/service/restart
+```
 
-As of v3.0.0, mavlink-anywhere includes a default **server-mode** endpoint on port 14550. This means:
+## What the UI shows
 
-- Any GCS (QGroundControl, Mission Planner) can connect TO the device by pointing at its IP:14550
-- No pre-configuration of GCS IP is needed on the device
-- Works out of the box for ad-hoc connections after the GCS sends first
+The first screen is intentionally short:
 
-Important routing notes:
+- router state and restart control;
+- current flight-data input;
+- simple MAVLink health;
+- listeners and output routes;
+- warnings that need attention.
 
-- `gcs_listen` is best for ad-hoc field access, not deterministic multi-client fanout
-- UDP server mode effectively tracks the last active sender on that endpoint
-- Local consumers such as MAVSDK (`127.0.0.1:14540`) and mavlink2rest (`127.0.0.1:14569`) should remain explicit normal-mode endpoints
-- An explicit outbound endpoint to a remote `:14550` can coexist with `gcs_listen` without a local bind conflict
-- The same remote GCS should not consume both paths at once, or it may see duplicate telemetry
-- For multiple dynamic remote clients, prefer the default TCP server on `5760`
+Profiles, raw config, logs, and board details are collapsed as advanced tools.
 
-This uses `mavlink-router` UDP **server mode**, so the router sends replies to the IP:port of the **last client that sent traffic** on that endpoint. Treat it as a convenient device-side listener, not as a multi-client fanout bus.
+Every dashboard route/input change creates a backup. If the router was running, the dashboard restarts it. A failed restart restores the previous files.
 
-If you need multiple simultaneous remote consumers:
-
-- Add dedicated `Mode=Normal` endpoints for each remote IP:port
-- Or use the default TCP server on port `5760`
-
-**QGroundControl**: Comm Links → Add → UDP → Server: `<device-ip>` → Port: `14550`
-
-If you delete `gcs_listen`, use **Add Endpoint** and choose **Listen for GCS** to restore it.
-
-## TCP Server (Port 5760)
-
-`mavlink-router` listens on `5760/tcp` by default. Any TCP client connecting there can send and receive routed MAVLink data.
-
-Use this when you want:
-
-- multiple dynamic clients without predefining every remote IP
-- a clean TCP path for tools that prefer `tcp://` connections
-- a lightweight read-only health probe from the dashboard
-
-PX4 SITL does not reserve `5760` by default. PX4's documented simulator defaults are UDP `14550`/`14540` plus simulator TCP `4560`. A conflict only exists if your own SITL stack or another service explicitly binds `5760`.
-
-## Update Workflow
-
-Update the installed tool and dashboard:
+## Install or update the dashboard
 
 ```bash
 cd ~/mavlink-anywhere
-git fetch --tags origin
-git pull --ff-only
 sudo ./configure_mavlink_router.sh --install-dashboard
 ```
 
-`--install-dashboard` updates the dashboard binary when the installed version is older than the checked-out `mavlink-anywhere` release.
+The update preserves the saved listen address, browser credentials, API token, and router config.
 
-If you also want to refresh the installed `mavlink-routerd` binary from source:
+Prebuilt binaries are published for Linux `arm6`, `arm64`, and `amd64`. If a matching download is unavailable and Go is installed, setup tries a local build. The router still works if the optional dashboard cannot be installed.
 
-```bash
-cd ~/mavlink-anywhere
-sudo ./install_mavlink_router.sh
-```
+## Firewall
 
-If the dashboard is exposed on the network, keep the explicit bind:
+If UFW is active and you intentionally expose the dashboard:
 
 ```bash
-sudo ./configure_mavlink_router.sh --install-dashboard \
-  --dashboard-listen 0.0.0.0:9070
+sudo ufw allow 9070/tcp
 ```
 
-## API Reference
+To remove that firewall permission later:
 
-The dashboard exposes a REST API for programmatic access:
-
-```
-GET    /api/v1/status              # Service status, version, board info
-GET    /api/v1/diagnostics         # MAVLink probe, warnings, docs links
-GET    /api/v1/config              # Current config as JSON
-PUT    /api/v1/config              # Write raw config
-GET    /api/v1/profiles/export     # Export current effective routing profile
-GET    /api/v1/profiles/summary    # Redacted fleet summary, endpoint policy, source overlay hash
-POST   /api/v1/profiles/validate   # Validate a fleet endpoint-policy baseline
-POST   /api/v1/profiles/diff       # Compare a baseline while preserving node hardware input
-POST   /api/v1/profiles/import     # Stage a dry-run fleet reconcile plan
-POST   /api/v1/profiles/preview    # Validate and preview imported profile
-POST   /api/v1/profiles/apply      # Legacy local apply or confirmed fleet dry-run apply
-POST   /api/v1/profiles/promote-reference-draft # Export endpoint-policy draft only
-GET    /api/v1/profiles/backups    # List routing backups
-POST   /api/v1/profiles/restore    # Restore the latest backup
-GET    /api/v1/endpoints           # List all endpoints
-POST   /api/v1/endpoints           # Add endpoint
-PUT    /api/v1/endpoints/{name}    # Update endpoint
-DELETE /api/v1/endpoints/{name}    # Delete endpoint
-PATCH  /api/v1/endpoints/{name}    # Toggle enable/disable
-GET    /api/v1/input               # Current input source
-PUT    /api/v1/input               # Change input source
-POST   /api/v1/service/restart     # Restart mavlink-router
-POST   /api/v1/service/stop        # Stop mavlink-router
-POST   /api/v1/service/start       # Start mavlink-router
-GET    /api/v1/logs/stream         # SSE real-time log stream
-GET    /api/v1/logs/recent?n=100   # Last N log lines
-GET    /api/v1/system/info         # Board and firewall info
-POST   /api/v1/system/firewall     # Open a firewall port
-GET    /api/v1/templates           # Endpoint templates for wizard
-GET    /api/v1/health              # Health check
+```bash
+sudo ufw delete allow 9070/tcp
 ```
 
-## Cross-Platform Support
+`dashboard hide` makes the service local-only even if the old firewall rule still exists, but removing unused rules is clearer.
 
-| Platform | Architecture | Binary | Status |
-|----------|-------------|--------|--------|
-| Raspberry Pi Zero/W | armv6 | `linux-arm6` | Full support |
-| Raspberry Pi 3/4/5 | arm64 | `linux-arm64` | Full support |
-| NVIDIA Jetson | arm64 | `linux-arm64` | Full support |
-| Ubuntu/Debian x86 | amd64 | `linux-amd64` | Full support |
+## API summary
 
-If your Linux architecture is outside this list, use CLI-only mode or the manual source build above.
+Read-only:
 
-## Routing Profiles
+```text
+GET /api/v1/status
+GET /api/v1/diagnostics
+GET /api/v1/config
+GET /api/v1/endpoints
+GET /api/v1/input
+GET /api/v1/logs/recent
+GET /api/v1/profiles/export
+GET /api/v1/profiles/summary
+```
 
-Routing profiles are a dashboard-first feature for repeatable endpoint layouts.
+Changes:
 
-What gets exported:
+```text
+PUT    /api/v1/config
+POST   /api/v1/endpoints
+PUT    /api/v1/endpoints/{name}
+PATCH  /api/v1/endpoints/{name}
+DELETE /api/v1/endpoints/{name}
+PUT    /api/v1/input
+POST   /api/v1/service/start
+POST   /api/v1/service/stop
+POST   /api/v1/service/restart
+```
 
-- router general settings
-- all configured endpoints, including the input endpoint
-- lightweight metadata such as profile name and export timestamp
-
-What does **not** get exported:
-
-- logs
-- runtime process state
-- firewall rules
-- host bootloader serial settings
-
-Import workflow:
-
-1. choose a `.json` profile file
-2. preview the changes
-3. choose `Replace current routing` or `Merge named endpoints`
-4. apply
-5. dashboard creates a backup and restarts `mavlink-router`
-
-Current rules:
-
-- importing a profile does **not** require reboot
-- reboot is only required when you separately change host serial boot settings
-- replace mode removes endpoints that are not present in the imported profile
-- merge mode keeps existing endpoints unless an imported endpoint with the same name replaces them
-- the dashboard regenerates `/etc/default/mavlink-router` from the effective config so CLI, docs, and UI stay aligned
-
-Restore workflow:
-
-- `Restore Last Good` restores the latest dashboard-created backup
-- it writes both the config file and the companion env file
-- it restarts `mavlink-router` after restore
-
-## Fleet Profile Control
-
-MDS Fleet Ops uses the dashboard API for endpoint-policy reconciliation. It does
-not overwrite node hardware input settings by default.
-
-Policy modes:
-
-- `observe`: validate and report only; apply is rejected.
-- `local`: node-local dashboard/API remains authoritative; apply is rejected.
-- `fleet-merge`: apply named baseline endpoints, preserve the hardware input
-  overlay, and preserve local non-baseline output endpoints.
-- `fleet-strict`: apply named baseline endpoints and prune local non-baseline
-  outputs only after advanced confirmation. Hardware input overlay is still
-  preserved.
-
-Safety rules:
-
-- `/api/v1/profiles/import` requires `dry_run=true` and stores an in-memory
-  plan with a confirmation token.
-- `/api/v1/profiles/apply` accepts either the legacy local dashboard
-  `{profile, mode}` request or a fleet `{dry_run_id, confirmation}` request.
-  Fleet confirmation accepts `confirmation.confirmation_token`; `token` is kept
-  as a backward-compatible alias for direct sidecar clients.
-- Remote machine mutations require `MAVLINK_ANYWHERE_API_TOKEN`; loopback
-  remains usable for standalone local operation when the token is unset.
-- Remote browser users can mutate after HTTP Basic Auth when
-  `MAVLINK_ANYWHERE_DASHBOARD_USER` and
-  `MAVLINK_ANYWHERE_DASHBOARD_PASSWORD_BCRYPT` are configured.
-- If the config write succeeds but the companion environment write fails, the
-  previous config/env files are restored.
-
-## Not Yet Implemented
-
-- Per-user dashboard login and CSRF protection for broad non-local exposure
-- Deep FC sensor/firmware discovery beyond passive routed-stream detection
+Fleet profile endpoints remain available for MDS. They use dry-run plus confirmation for managed fleet changes. See the API responses and source tests when integrating a machine client.
 
 ## Troubleshooting
 
-**Dashboard not accessible:**
-```bash
-# Check if service is running
-sudo systemctl status mavlink-anywhere-dashboard
-
-# Check what port it's listening on
-ss -tlnp | grep 9070
-
-# View dashboard logs
-sudo journalctl -u mavlink-anywhere-dashboard -f
-```
-
-If the service is bound to localhost only, use SSH tunneling:
+Dashboard status and logs:
 
 ```bash
-ssh -L 9070:localhost:9070 user@<device-ip>
-# Then open http://127.0.0.1:9070 locally
+mla dashboard status
+sudo journalctl -u mavlink-anywhere-dashboard -n 100 --no-pager
 ```
 
-**Dashboard shows "No endpoints":**
-- Verify config exists: `cat /etc/mavlink-router/main.conf`
-- Re-run: `sudo ./configure_mavlink_router.sh`
+If the browser repeatedly asks for credentials, reset the password and try a private browser window:
+
+```bash
+sudo mla dashboard password reset
+```
+
+If the page is unreachable, confirm whether it is deliberately local-only:
+
+```bash
+mla dashboard status
+```
+
+See [Troubleshooting](TROUBLESHOOTING.md) for router and serial checks.

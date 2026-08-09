@@ -52,18 +52,6 @@ func (s *Server) addEndpoint(w http.ResponseWriter, r *http.Request) {
 	if ep.Type == "" {
 		ep.Type = "UdpEndpoint"
 	}
-	if ep.Address != "" {
-		if err := config.ValidateIP(ep.Address); err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-	}
-	if ep.Port > 0 {
-		if err := config.ValidatePort(ep.Port); err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-	}
 	if ep.Mode == "" {
 		ep.Mode = "normal"
 	}
@@ -73,17 +61,23 @@ func (s *Server) addEndpoint(w http.ResponseWriter, r *http.Request) {
 	if ep.Category == "" {
 		ep.Category = endpoints.CategoryForEndpoint(ep.Name, ep.Mode, ep.Address, ep.Port)
 	}
+	if err := config.ValidateEndpoint(ep); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	if err := config.AddEndpoint(s.configPath, ep); err != nil {
+	restarted, err := s.applyRouterMutation(func() error {
+		if err := config.AddEndpoint(s.configPath, ep); err != nil {
+			return err
+		}
+		return config.SyncEnvFromConfig(s.configPath, s.envPath)
+	})
+	if err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
-		return
-	}
 
-	writeJSON(w, http.StatusCreated, map[string]string{"status": "endpoint added", "name": ep.Name})
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"status": "endpoint added", "name": ep.Name, "restarted": restarted})
 }
 
 func (s *Server) handleEndpointByName(w http.ResponseWriter, r *http.Request) {
@@ -118,29 +112,40 @@ func (s *Server) updateEndpoint(w http.ResponseWriter, r *http.Request, name str
 		return
 	}
 	ep.Name = name
+	if ep.Type == "" {
+		ep.Type = "UdpEndpoint"
+	}
+	if err := config.ValidateEndpoint(ep); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	if err := config.UpdateEndpoint(s.configPath, name, ep); err != nil {
+	restarted, err := s.applyRouterMutation(func() error {
+		if err := config.UpdateEndpoint(s.configPath, name, ep); err != nil {
+			return err
+		}
+		return config.SyncEnvFromConfig(s.configPath, s.envPath)
+	})
+	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
-		return
-	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "endpoint updated"})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "endpoint updated", "restarted": restarted})
 }
 
 func (s *Server) deleteEndpoint(w http.ResponseWriter, r *http.Request, name string) {
-	if err := config.DeleteEndpoint(s.configPath, name); err != nil {
+	restarted, err := s.applyRouterMutation(func() error {
+		if err := config.DeleteEndpoint(s.configPath, name); err != nil {
+			return err
+		}
+		return config.SyncEnvFromConfig(s.configPath, s.envPath)
+	})
+	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "endpoint deleted"})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "endpoint deleted", "restarted": restarted})
 }
 
 func (s *Server) toggleEndpoint(w http.ResponseWriter, r *http.Request, name string) {
@@ -158,14 +163,16 @@ func (s *Server) toggleEndpoint(w http.ResponseWriter, r *http.Request, name str
 		return
 	}
 
-	if err := config.ToggleEndpoint(s.configPath, name, payload.Enabled); err != nil {
+	restarted, err := s.applyRouterMutation(func() error {
+		if err := config.ToggleEndpoint(s.configPath, name, payload.Enabled); err != nil {
+			return err
+		}
+		return config.SyncEnvFromConfig(s.configPath, s.envPath)
+	})
+	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if err := config.SyncEnvFromConfig(s.configPath, s.envPath); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to sync env: "+err.Error())
-		return
-	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "endpoint toggled"})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "endpoint toggled", "restarted": restarted})
 }

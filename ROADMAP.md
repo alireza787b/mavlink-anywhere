@@ -6,6 +6,7 @@ field networks, and ground-control workflows.
 ## Current Focus
 
 - clear dashboard endpoint management
+- beginner-first `mla` commands for routes, inputs, dashboard access, and auth
 - robust serial/UDP/TCP configuration
 - MDS Fleet Ops integration through sanitized routing summaries and drift hashes
 - local QGroundControl fallback links for field operations
@@ -13,7 +14,6 @@ field networks, and ground-control workflows.
 ## Near-Term
 
 - finalized brand assets after logo approval
-- optional sidecar dashboard/API auth design
 - Caddy/reverse-proxy guidance for trusted multi-dashboard deployments
 - clearer profile import/export workflows for shared fleet endpoints while
   preserving node-local serial and hardware overlays

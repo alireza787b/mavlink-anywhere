@@ -135,6 +135,23 @@ body {
     gap: 16px;
 }
 
+.welcome {
+    padding: 8px 4px 2px;
+}
+
+.welcome h2 {
+    font-size: 1.25rem;
+    margin-bottom: 4px;
+}
+
+.welcome p,
+.card-intro {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.card-intro { margin: -6px 0 16px; }
+
 /* Cards */
 .card {
     background: var(--bg-card);
@@ -168,6 +185,8 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 14px;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .card-header-row .card-title { margin-bottom: 0; }
@@ -175,7 +194,46 @@ body {
 .card-actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
+
+.small-details {
+    margin-top: 12px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.small-details summary,
+.advanced-card > summary {
+    cursor: pointer;
+}
+
+.detail-actions { margin: 10px 0 0; }
+
+.health-summary {
+    color: var(--green);
+    font-size: 0.88rem;
+}
+
+.health-grid { margin-top: 12px; }
+
+.advanced-card {
+    order: 10;
+    padding: 0;
+}
+
+.advanced-card > summary {
+    padding: 16px 20px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.88rem;
+}
+
+.advanced-card[open] > summary {
+    border-bottom: 1px solid var(--border);
+}
+
+.advanced-card-body { padding: 20px; }
 
 /* Buttons */
 .btn {
@@ -466,6 +524,15 @@ body {
 
 .raw-config:focus { outline: none; border-color: var(--accent); }
 
+.raw-warning {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--yellow);
+    background: rgba(234, 179, 8, 0.08);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
 .raw-config-actions {
     display: flex;
     gap: 8px;
@@ -695,8 +762,20 @@ select.input { appearance: auto; }
 
 /* Responsive */
 @media (max-width: 480px) {
-    .header { padding: 12px 16px; flex-direction: column; gap: 8px; }
     .main { padding: 12px 10px; }
     .card { padding: 14px; }
     .system-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+    .header {
+        padding: 12px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .header-left { flex-wrap: wrap; }
+    .card-header-row { align-items: flex-start; }
+    .card-actions { width: 100%; }
+    .endpoint-card { padding: 12px; }
 }
